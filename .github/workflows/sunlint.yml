@@ -1,0 +1,115 @@
+name: Sunlint
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sunlint:
+    name: Sunlint full analysis
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: RealWorld NestJS API
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: RealWorld NestJS API/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Sunlint (auto engine, all rules)
+        id: sunlint
+        shell: bash
+        run: |
+          set -o pipefail
+          npx --no-install sunlint --all --input=src --engine=auto --format=json --output=sunlint-report.json --output-summary=sunlint-summary.json 2>&1 | tee sunlint.log
+          status=${PIPESTATUS[0]}
+          echo "Sunlint process exit code: ${status}"
+          exit "${status}"
+
+      - name: Verify engines, rules and violations
+        if: always()
+        shell: bash
+        run: |
+          status=0
+
+          if [ ! -f sunlint.log ]; then
+            echo "::error::Sunlint did not produce sunlint.log."
+            status=1
+          fi
+
+          echo "=== Sunlint engine lines ==="
+          grep -E "Heuristic Engine|ESLint Engine" sunlint.log || true
+
+          if ! grep -q "Heuristic Engine" sunlint.log; then
+            echo "::error::The heuristic engine did not execute."
+            status=1
+          fi
+
+          if ! grep -q "ESLint Engine" sunlint.log; then
+            echo "::error::The ESLint engine did not execute."
+            status=1
+          fi
+
+          if grep -qE "Heuristic analysis failed|ESLint analysis failed|analysis failed" sunlint.log; then
+            echo "::error::At least one Sunlint engine failed; the final 'All checks passed' message is not valid."
+            status=1
+          fi
+
+          # package-lock.json pins Sunlint 1.3.56: auto = 65 heuristic + 1 ESLint rule.
+          if ! grep -q "Heuristic Engine · 65 rules" sunlint.log; then
+            echo "::error::Expected 65 heuristic rules to execute."
+            status=1
+          fi
+
+          if ! grep -q "ESLint Engine · 1 rules" sunlint.log; then
+            echo "::error::Expected the ESLint engine rule (C032) to execute."
+            status=1
+          fi
+
+          if [ ! -f sunlint-summary.json ]; then
+            echo "::error::Sunlint did not produce sunlint-summary.json."
+            status=1
+          elif ! node -e '
+            const fs = require("node:fs");
+            const summary = JSON.parse(fs.readFileSync("sunlint-summary.json", "utf8"));
+            console.log(`Sunlint summary: errors=${summary.error_count}, warnings=${summary.warning_count}, total=${summary.total_violations}`);
+            if (summary.error_count > 0) {
+              console.error(`::error::Sunlint reported ${summary.error_count} error-level violation(s).`);
+              process.exit(1);
+            }
+          '; then
+            status=1
+          fi
+
+          exit "${status}"
+
+      - name: Upload Sunlint evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunlint-results
+          path: |
+            RealWorld NestJS API/sunlint.log
+            RealWorld NestJS API/sunlint-report.json
+            RealWorld NestJS API/sunlint-summary.json
+          if-no-files-found: warn
+          retention-days: 14
