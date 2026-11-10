@@ -1,7 +1,7 @@
 import {
+  ConflictException,
   Injectable,
   InternalServerErrorException,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
@@ -37,13 +37,16 @@ export class UsersService {
       passwordHash: await hash(input.password, 12),
       bio: null,
       image: null,
+      tokenVersion: 0,
+      isActive: true,
+      emailVerifiedAt: null,
     });
 
     try {
       return await this.usersRepository.save(user);
     } catch (error) {
       if (isDuplicateKeyError(error)) {
-        throw new UnprocessableEntityException({
+        throw new ConflictException({
           errors: { body: ['Username or email is already taken.'] },
         });
       }
@@ -56,11 +59,57 @@ export class UsersService {
   findByEmail(email: string): Promise<UserEntity | null> {
     return this.usersRepository.findOne({
       where: { email: email.trim().toLowerCase() },
-      select: ['id', 'username', 'email', 'passwordHash', 'bio', 'image'],
+      select: [
+        'id',
+        'username',
+        'email',
+        'passwordHash',
+        'bio',
+        'image',
+        'tokenVersion',
+        'isActive',
+        'emailVerifiedAt',
+      ],
     });
   }
 
   findById(id: string): Promise<UserEntity | null> {
     return this.usersRepository.findOne({ where: { id } });
+  }
+
+  findByIdWithPassword(id: string): Promise<UserEntity | null> {
+    return this.usersRepository.findOne({
+      where: { id },
+      select: [
+        'id',
+        'username',
+        'email',
+        'passwordHash',
+        'bio',
+        'image',
+        'tokenVersion',
+        'isActive',
+        'emailVerifiedAt',
+      ],
+    });
+  }
+
+  async updatePassword(
+    user: UserEntity,
+    password: string,
+  ): Promise<UserEntity> {
+    user.passwordHash = await hash(password, 12);
+    user.tokenVersion += 1;
+    return this.usersRepository.save(user);
+  }
+
+  async incrementTokenVersion(user: UserEntity): Promise<UserEntity> {
+    user.tokenVersion += 1;
+    return this.usersRepository.save(user);
+  }
+
+  async markEmailVerified(user: UserEntity): Promise<UserEntity> {
+    user.emailVerifiedAt = new Date();
+    return this.usersRepository.save(user);
   }
 }

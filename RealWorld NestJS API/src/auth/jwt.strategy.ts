@@ -8,6 +8,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { JwtPayload } from './jwt-payload';
 import { RedisService } from './redis.service';
+import { UsersService } from '../users/users.service';
 
 const AUTHORIZATION_SCHEME = 'Token ';
 
@@ -24,6 +25,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(
     configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly usersService: UsersService,
   ) {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
@@ -36,7 +38,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload): Promise<JwtPayload> {
-    if (!payload.sub || !payload.jti || !payload.exp) {
+    if (
+      !payload.sub ||
+      !payload.jti ||
+      !payload.exp ||
+      payload.type !== 'access' ||
+      !Number.isInteger(payload.version)
+    ) {
       throw new UnauthorizedException();
     }
 
@@ -50,6 +58,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
     if (isRevoked) throw new UnauthorizedException('Token has been revoked.');
+
+    const user = await this.usersService.findById(payload.sub);
+    if (
+      !user ||
+      !user.isActive ||
+      !user.emailVerifiedAt ||
+      user.tokenVersion !== payload.version
+    ) {
+      throw new UnauthorizedException();
+    }
 
     return payload;
   }

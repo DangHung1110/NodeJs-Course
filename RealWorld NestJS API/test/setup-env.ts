@@ -1,0 +1,22 @@
+process.env.NODE_ENV = 'test';
+process.env.DB_HOST = '127.0.0.1';
+process.env.DB_PORT = '3306';
+process.env.DB_USERNAME = 'realworld_test';
+process.env.DB_PASSWORD = 'test-password';
+process.env.DB_DATABASE = 'realworld_test';
+process.env.JWT_SECRET = 'test-secret-with-at-least-32-characters';
+process.env.JWT_EXPIRES_IN = '3600';
+process.env.JWT_REFRESH_SECRET =
+  'different-refresh-secret-with-at-least-32-characters';
+process.env.JWT_REFRESH_EXPIRES_IN = '604800';
+process.env.REDIS_URL = 'redis://127.0.0.1:6379';
+process.env.MAIL_HOST = 'smtp.example.com';
+process.env.MAIL_PORT = '465';
+process.env.MAIL_SECURE = 'true';
+process.env.MAIL_USER = 'mailer@example.com';
+process.env.MAIL_PASSWORD = 'test-mail-password';
+process.env.MAIL_FROM = 'mailer@example.com';
+process.env.OTP_SECRET = 'test-otp-secret-with-at-least-32-characters';
+process.env.OTP_EXPIRES_IN = '600';
+process.env.OTP_MAX_ATTEMPTS = '5';
+process.env.OTP_RESEND_COOLDOWN = '60';

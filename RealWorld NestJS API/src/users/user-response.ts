@@ -9,6 +9,7 @@ export interface AuthenticatedUser {
 
 export interface UserResponse extends AuthenticatedUser {
   readonly token: string;
+  readonly refreshToken?: string;
 }
 
 export function toAuthenticatedUser(

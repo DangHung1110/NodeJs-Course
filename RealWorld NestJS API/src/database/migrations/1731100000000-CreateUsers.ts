@@ -19,7 +19,7 @@ export class CreateUsers1731100000000 implements MigrationInterface {
         UNIQUE INDEX UQ_users_username (username),
         UNIQUE INDEX UQ_users_email (email),
         PRIMARY KEY (id)
-      ) ENGINE=InnoDB
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     `);
   }
 

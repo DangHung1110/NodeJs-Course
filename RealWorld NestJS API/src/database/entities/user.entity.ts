@@ -31,6 +31,20 @@ export class UserEntity {
   @Column({ type: 'text', nullable: true })
   image!: string | null;
 
+  @Column({ name: 'token_version', type: 'int', unsigned: true, default: 0 })
+  tokenVersion!: number;
+
+  @Column({ name: 'is_active', type: 'boolean', default: true })
+  isActive!: boolean;
+
+  @Column({
+    name: 'email_verified_at',
+    type: 'datetime',
+    precision: 6,
+    nullable: true,
+  })
+  emailVerifiedAt!: Date | null;
+
   @CreateDateColumn({ name: 'created_at', precision: 6 })
   createdAt!: Date;
 

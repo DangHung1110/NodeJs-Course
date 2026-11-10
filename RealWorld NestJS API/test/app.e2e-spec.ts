@@ -64,13 +64,13 @@ describe('Foundation (e2e)', () => {
     await request(app.getHttpServer())
       .post('/api/foundation-probe')
       .send({})
-      .expect(400);
+      .expect(422);
   });
 
   it('rejects unknown properties', async () => {
     await request(app.getHttpServer())
       .post('/api/foundation-probe')
       .send({ name: 'foundation', unexpected: true })
-      .expect(400);
+      .expect(422);
   });
 });
