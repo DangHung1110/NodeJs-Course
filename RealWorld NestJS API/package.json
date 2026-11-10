@@ -21,19 +21,36 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "migration:create": "typeorm migration:create",
+    "migration:generate": "npm run build && typeorm migration:generate",
+    "migration:run": "npm run build && typeorm migration:run -d dist/database/data-source.js",
+    "migration:revert": "npm run build && typeorm migration:revert -d dist/database/data-source.js",
+    "migration:reset": "npm run build && node scripts/reset-database.cjs"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
+    "@nestjs/jwt": "^11.0.2",
+    "@nestjs/passport": "^11.0.5",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/swagger": "^11.4.8",
+    "@nestjs/throttler": "^6.7.1",
+    "@nestjs/typeorm": "^11.0.3",
+    "@types/passport-jwt": "^4.0.1",
+    "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "dotenv": "^18.0.10",
+    "ioredis": "^5.11.1",
+    "mysql2": "^3.24.6",
     "nestjs-i18n": "^10.8.5",
+    "passport": "^0.7.0",
+    "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "typeorm": "^0.3.31"
   },
   "overrides": {
     "multer": "2.5.0"

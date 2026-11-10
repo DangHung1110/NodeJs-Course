@@ -7,6 +7,14 @@ export interface EnvironmentVariables {
   readonly NODE_ENV: NodeEnvironment;
   readonly PORT: number;
   readonly API_PREFIX: string;
+  readonly DB_HOST: string;
+  readonly DB_PORT: number;
+  readonly DB_USERNAME: string;
+  readonly DB_PASSWORD: string;
+  readonly DB_DATABASE: string;
+  readonly JWT_SECRET: string;
+  readonly JWT_EXPIRES_IN: number;
+  readonly REDIS_URL: string;
 }
 
 const NODE_ENVIRONMENTS: readonly NodeEnvironment[] = [
@@ -75,9 +83,102 @@ export function validateEnvironment(
     );
   }
 
+  const isTest = nodeEnv === 'test';
+  const databaseHost = readString(config, 'DB_HOST', isTest ? '127.0.0.1' : '');
+  const databaseUsername = readString(
+    config,
+    'DB_USERNAME',
+    isTest ? 'test' : '',
+  );
+  const databasePassword = readString(
+    config,
+    'DB_PASSWORD',
+    isTest ? 'test' : '',
+  );
+  const databaseName = readString(
+    config,
+    'DB_DATABASE',
+    isTest ? 'realworld_test' : '',
+  );
+  const jwtSecret = readString(
+    config,
+    'JWT_SECRET',
+    isTest ? 'test-only-secret-with-at-least-32-characters' : '',
+  );
+  const redisUrl = readString(
+    config,
+    'REDIS_URL',
+    isTest ? 'redis://127.0.0.1:6379' : '',
+  );
+
+  if (
+    !databaseHost ||
+    !databaseUsername ||
+    !databasePassword ||
+    !databaseName
+  ) {
+    throw new EnvironmentValidationError(
+      'DB_HOST, DB_USERNAME, DB_PASSWORD, and DB_DATABASE are required.',
+    );
+  }
+
+  if (jwtSecret.length < 32) {
+    throw new EnvironmentValidationError(
+      'JWT_SECRET must be at least 32 characters.',
+    );
+  }
+
+  let parsedRedisUrl: URL;
+
+  try {
+    parsedRedisUrl = new URL(redisUrl);
+  } catch {
+    throw new EnvironmentValidationError(
+      'REDIS_URL must be a valid redis:// or rediss:// URL.',
+    );
+  }
+
+  if (
+    (parsedRedisUrl.protocol !== 'redis:' &&
+      parsedRedisUrl.protocol !== 'rediss:') ||
+    !parsedRedisUrl.hostname
+  ) {
+    throw new EnvironmentValidationError(
+      'REDIS_URL must be a valid redis:// or rediss:// URL.',
+    );
+  }
+
+  const databasePort = Number(
+    readString(config, 'DB_PORT', isTest ? '3306' : ''),
+  );
+  if (
+    !Number.isInteger(databasePort) ||
+    databasePort < 1 ||
+    databasePort > 65535
+  ) {
+    throw new EnvironmentValidationError(
+      'DB_PORT must be an integer between 1 and 65535.',
+    );
+  }
+
+  const jwtExpiresIn = Number(readString(config, 'JWT_EXPIRES_IN', '3600'));
+  if (!Number.isInteger(jwtExpiresIn) || jwtExpiresIn < 1) {
+    throw new EnvironmentValidationError(
+      'JWT_EXPIRES_IN must be a positive integer in seconds.',
+    );
+  }
+
   return {
     NODE_ENV: nodeEnv,
     PORT: port,
     API_PREFIX: apiPrefix,
+    DB_HOST: databaseHost,
+    DB_PORT: databasePort,
+    DB_USERNAME: databaseUsername,
+    DB_PASSWORD: databasePassword,
+    DB_DATABASE: databaseName,
+    JWT_SECRET: jwtSecret,
+    JWT_EXPIRES_IN: jwtExpiresIn,
+    REDIS_URL: redisUrl,
   };
 }
