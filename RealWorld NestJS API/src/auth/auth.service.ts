@@ -12,16 +12,16 @@ import { RedisService } from './redis.service';
 import { OtpPurpose, OtpService } from './otp.service';
 import { UserEntity } from '../database/entities/user.entity';
 import { MailService } from '../mail/mail.service';
-import { ChangePasswordDto } from '../users/dto/change-password.dto';
 import {
+  ChangePasswordDto,
   EmailDto,
+  LoginUserDto,
+  RefreshTokenDto,
+  RegisterUserDto,
   ResetPasswordDto,
   VerifyEmailDto,
-} from '../users/dto/email-verification.dto';
+} from './auth.dto';
 import { UsersService } from '../users/users.service';
-import { LoginUserDto } from '../users/dto/login-user.dto';
-import { RefreshTokenDto } from '../users/dto/refresh-token.dto';
-import { RegisterUserDto } from '../users/dto/register-user.dto';
 import { UserResponse, toAuthenticatedUser } from '../users/user-response';
 
 const DUMMY_PASSWORD_HASH =
@@ -52,16 +52,15 @@ export class AuthService {
 
   async register(input: RegisterUserDto): Promise<void> {
     const user = await this.usersService.create(input);
-    await this.sendVerificationCode(user.email, true);
+    await this.sendOtp('email-verification', user.email, true);
   }
 
   async login(input: LoginUserDto): Promise<UserResponse> {
     const user = await this.usersService.findByEmail(input.email);
-    const passwordMatches = await compare(
-      input.password,
-      user?.passwordHash ?? DUMMY_PASSWORD_HASH,
-    );
-    if (!user || !user.isActive || !passwordMatches) {
+    if (
+      !user?.isActive ||
+      !(await this.passwordMatches(user, input.password))
+    ) {
       throw new UnauthorizedException('Invalid email or password.');
     }
     if (!user.emailVerifiedAt) {
@@ -82,13 +81,13 @@ export class AuthService {
   async resendVerification(input: EmailDto): Promise<void> {
     const user = await this.usersService.findByEmail(input.email);
     if (!user?.isActive || user.emailVerifiedAt) return;
-    await this.sendVerificationCode(user.email, false);
+    await this.sendOtp('email-verification', user.email);
   }
 
   async forgotPassword(input: EmailDto): Promise<void> {
     const user = await this.usersService.findByEmail(input.email);
     if (!user?.isActive || !user.emailVerifiedAt) return;
-    await this.sendPasswordResetCode(user.email);
+    await this.sendOtp('password-reset', user.email);
   }
 
   async resetPassword(input: ResetPasswordDto): Promise<void> {
@@ -101,29 +100,7 @@ export class AuthService {
   }
 
   async refresh(input: RefreshTokenDto): Promise<UserResponse> {
-    let payload: RefreshTokenPayload;
-    try {
-      payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
-        input.refreshToken,
-        {
-          secret: this.refreshTokenSecret,
-          algorithms: ['HS256'],
-        },
-      );
-    } catch {
-      throw new UnauthorizedException('Invalid refresh token.');
-    }
-
-    if (
-      payload.type !== 'refresh' ||
-      !payload.sub ||
-      !payload.jti ||
-      !payload.exp ||
-      !Number.isInteger(payload.version)
-    ) {
-      throw new UnauthorizedException('Invalid refresh token.');
-    }
-
+    const payload = await this.verifyRefreshToken(input.refreshToken);
     const user = await this.usersService.findById(payload.sub);
     if (
       !user ||
@@ -134,23 +111,8 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token.');
     }
 
-    const remainingSeconds = Math.max(
-      0,
-      payload.exp - Math.floor(Date.now() / 1000),
-    );
-    let revoked: boolean;
-    try {
-      revoked = await this.redisService.revokeOnce(
-        payload.jti,
-        remainingSeconds,
-      );
-    } catch (error) {
-      throw new ServiceUnavailableException(
-        'Token revocation is temporarily unavailable.',
-        { cause: error },
-      );
-    }
-    if (!revoked) throw new UnauthorizedException('Invalid refresh token.');
+    const revoked = await this.revokeToken(payload, true);
+    if (!revoked) this.invalidRefreshToken();
 
     return this.issueTokens(user);
   }
@@ -168,11 +130,11 @@ export class AuthService {
     input: ChangePasswordDto,
   ): Promise<UserResponse> {
     const user = await this.usersService.findByIdWithPassword(userId);
-    const passwordMatches = await compare(
-      input.currentPassword,
-      user?.passwordHash ?? DUMMY_PASSWORD_HASH,
-    );
-    if (!user || !user.isActive || !user.emailVerifiedAt || !passwordMatches) {
+    if (
+      !user?.isActive ||
+      !user.emailVerifiedAt ||
+      !(await this.passwordMatches(user, input.currentPassword))
+    ) {
       throw new UnauthorizedException('Current password is invalid.');
     }
 
@@ -189,18 +151,7 @@ export class AuthService {
   }
 
   async logout(payload: JwtPayload): Promise<void> {
-    const remainingSeconds = Math.max(
-      0,
-      payload.exp - Math.floor(Date.now() / 1000),
-    );
-    try {
-      await this.redisService.revoke(payload.jti, remainingSeconds);
-    } catch (error) {
-      throw new ServiceUnavailableException(
-        'Token revocation is temporarily unavailable.',
-        { cause: error },
-      );
-    }
+    await this.revokeToken(payload);
   }
 
   private async issueTokens(user: UserEntity): Promise<UserResponse> {
@@ -234,39 +185,74 @@ export class AuthService {
     return { ...toAuthenticatedUser(user), token, refreshToken };
   }
 
-  private async sendVerificationCode(
-    email: string,
-    replaceExisting: boolean,
-  ): Promise<void> {
-    await this.sendOtp('email-verification', email, replaceExisting, (otp) =>
-      this.mailService.sendVerificationOtp(
-        email,
-        otp,
-        this.otpService.expiresInSeconds,
-      ),
-    );
+  private async verifyRefreshToken(
+    token: string,
+  ): Promise<RefreshTokenPayload> {
+    try {
+      const payload = await this.jwtService.verifyAsync<RefreshTokenPayload>(
+        token,
+        {
+          secret: this.refreshTokenSecret,
+          algorithms: ['HS256'],
+        },
+      );
+      if (
+        payload.type !== 'refresh' ||
+        !payload.sub ||
+        !payload.jti ||
+        !payload.exp ||
+        !Number.isInteger(payload.version)
+      ) {
+        this.invalidRefreshToken();
+      }
+      return payload;
+    } catch {
+      return this.invalidRefreshToken();
+    }
   }
 
-  private async sendPasswordResetCode(email: string): Promise<void> {
-    await this.sendOtp('password-reset', email, false, (otp) =>
-      this.mailService.sendPasswordResetOtp(
-        email,
-        otp,
-        this.otpService.expiresInSeconds,
-      ),
-    );
+  private invalidRefreshToken(): never {
+    throw new UnauthorizedException('Invalid refresh token.');
+  }
+
+  private passwordMatches(
+    user: UserEntity | null,
+    password: string,
+  ): Promise<boolean> {
+    return compare(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+  }
+
+  private async revokeToken(
+    payload: Pick<JwtPayload, 'jti' | 'exp'>,
+    once = false,
+  ): Promise<boolean> {
+    const ttl = Math.max(0, payload.exp - Math.floor(Date.now() / 1000));
+    try {
+      if (once) return this.redisService.revokeOnce(payload.jti, ttl);
+      await this.redisService.revoke(payload.jti, ttl);
+      return true;
+    } catch (error) {
+      throw new ServiceUnavailableException(
+        'Token revocation is temporarily unavailable.',
+        { cause: error },
+      );
+    }
   }
 
   private async sendOtp(
     purpose: OtpPurpose,
     email: string,
-    replaceExisting: boolean,
-    send: (otp: string) => Promise<void>,
+    replaceExisting = false,
   ): Promise<void> {
     const otp = await this.otpService.issue(purpose, email, replaceExisting);
     if (!otp) return;
     try {
-      await send(otp);
+      await this.mailService.sendOtp(
+        email,
+        purpose,
+        otp,
+        this.otpService.expiresInSeconds,
+      );
     } catch (error) {
       await this.otpService.clear(purpose, email);
       throw new ServiceUnavailableException(

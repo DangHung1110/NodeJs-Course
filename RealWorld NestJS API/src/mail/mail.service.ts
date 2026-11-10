@@ -1,6 +1,18 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import nodemailer, { Transporter } from 'nodemailer';
+import type { OtpPurpose } from '../auth/otp.service';
+
+const OTP_MAIL = {
+  'email-verification': {
+    subject: 'Verify your email address',
+    label: 'email verification',
+  },
+  'password-reset': {
+    subject: 'Reset your password',
+    label: 'password reset',
+  },
+} as const;
 
 @Injectable()
 export class MailService {
@@ -20,56 +32,20 @@ export class MailService {
     });
   }
 
-  sendVerificationOtp(
+  async sendOtp(
     recipient: string,
+    purpose: OtpPurpose,
     otp: string,
     expiresInSeconds: number,
   ): Promise<void> {
-    return this.sendOtp(
-      recipient,
-      'Verify your email address',
-      'email verification',
-      otp,
-      expiresInSeconds,
-    );
-  }
-
-  sendPasswordResetOtp(
-    recipient: string,
-    otp: string,
-    expiresInSeconds: number,
-  ): Promise<void> {
-    return this.sendOtp(
-      recipient,
-      'Reset your password',
-      'password reset',
-      otp,
-      expiresInSeconds,
-    );
-  }
-
-  private async sendOtp(
-    recipient: string,
-    subject: string,
-    purpose: string,
-    otp: string,
-    expiresInSeconds: number,
-  ): Promise<void> {
+    const mail = OTP_MAIL[purpose];
     const expiresInMinutes = Math.ceil(expiresInSeconds / 60);
     try {
       await this.transporter.sendMail({
         from: this.from,
         to: recipient,
-        subject,
-        text: [
-          'Your ',
-          purpose,
-          ' code is ',
-          otp,
-          '. It expires in ',
-          String(expiresInMinutes),
-          ' minutes.',
-        ].join(''),
+        subject: mail.subject,
+        text: `Your ${mail.label} code is ${otp}. It expires in ${String(expiresInMinutes)} minutes.`,
       });
     } catch (error) {
       throw new ServiceUnavailableException(

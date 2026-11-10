@@ -1,15 +1,26 @@
 import {
-  ConflictException,
   Injectable,
   InternalServerErrorException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { hash } from 'bcryptjs';
 import { Repository } from 'typeorm';
+import { RegisterUserDto } from '../auth/auth.dto';
 import { UserEntity } from '../database/entities/user.entity';
-import { RegisterUserDto } from './dto/register-user.dto';
 
 const DUPLICATE_KEY_CODE = 'ER_DUP_ENTRY';
+const USER_WITH_PASSWORD = [
+  'id',
+  'username',
+  'email',
+  'passwordHash',
+  'bio',
+  'image',
+  'tokenVersion',
+  'isActive',
+  'emailVerifiedAt',
+] as (keyof UserEntity)[];
 
 function isDuplicateKeyError(error: unknown): boolean {
   return (
@@ -37,16 +48,13 @@ export class UsersService {
       passwordHash: await hash(input.password, 12),
       bio: null,
       image: null,
-      tokenVersion: 0,
-      isActive: true,
-      emailVerifiedAt: null,
     });
 
     try {
       return await this.usersRepository.save(user);
     } catch (error) {
       if (isDuplicateKeyError(error)) {
-        throw new ConflictException({
+        throw new UnprocessableEntityException({
           errors: { body: ['Username or email is already taken.'] },
         });
       }
@@ -59,17 +67,7 @@ export class UsersService {
   findByEmail(email: string): Promise<UserEntity | null> {
     return this.usersRepository.findOne({
       where: { email: email.trim().toLowerCase() },
-      select: [
-        'id',
-        'username',
-        'email',
-        'passwordHash',
-        'bio',
-        'image',
-        'tokenVersion',
-        'isActive',
-        'emailVerifiedAt',
-      ],
+      select: USER_WITH_PASSWORD,
     });
   }
 
@@ -80,17 +78,7 @@ export class UsersService {
   findByIdWithPassword(id: string): Promise<UserEntity | null> {
     return this.usersRepository.findOne({
       where: { id },
-      select: [
-        'id',
-        'username',
-        'email',
-        'passwordHash',
-        'bio',
-        'image',
-        'tokenVersion',
-        'isActive',
-        'emailVerifiedAt',
-      ],
+      select: USER_WITH_PASSWORD,
     });
   }
 

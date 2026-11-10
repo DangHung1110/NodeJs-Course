@@ -20,45 +20,18 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { Request } from 'express';
-import { ApiProperty } from '@nestjs/swagger';
-import { IsDefined, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
-import { AuthService } from './auth.service';
-import { JwtPayload } from './jwt-payload';
-import { LoginUserDto } from '../users/dto/login-user.dto';
-import { ChangePasswordDto } from '../users/dto/change-password.dto';
 import {
+  ChangePasswordEnvelope,
   EmailDto,
+  LoginEnvelope,
+  RefreshTokenDto,
+  RegisterEnvelope,
   ResetPasswordDto,
   VerifyEmailDto,
-} from '../users/dto/email-verification.dto';
-import { RefreshTokenDto } from '../users/dto/refresh-token.dto';
-import { RegisterUserDto } from '../users/dto/register-user.dto';
+} from './auth.dto';
+import { AuthService } from './auth.service';
+import { JwtPayload } from './jwt-payload';
 import { UserResponse } from '../users/user-response';
-
-class RegisterEnvelope {
-  @ApiProperty({ type: RegisterUserDto })
-  @IsDefined()
-  @ValidateNested()
-  @Type(() => RegisterUserDto)
-  user!: RegisterUserDto;
-}
-
-class LoginEnvelope {
-  @ApiProperty({ type: LoginUserDto })
-  @IsDefined()
-  @ValidateNested()
-  @Type(() => LoginUserDto)
-  user!: LoginUserDto;
-}
-
-class ChangePasswordEnvelope {
-  @ApiProperty({ type: ChangePasswordDto })
-  @IsDefined()
-  @ValidateNested()
-  @Type(() => ChangePasswordDto)
-  user!: ChangePasswordDto;
-}
 
 interface AuthenticatedRequest extends Request {
   user: JwtPayload;

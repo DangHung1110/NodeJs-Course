@@ -4,33 +4,6 @@ import Redis from 'ioredis';
 
 const RETRY_STEP_MS = 100;
 const RETRY_MAX_DELAY_MS = 2_000;
-const STORE_OTP_SCRIPT = `
-  if ARGV[4] == '0' and redis.call('EXISTS', KEYS[2]) == 1 then
-    return 0
-  end
-  redis.call('HSET', KEYS[1], 'digest', ARGV[1], 'attempts', '0')
-  redis.call('EXPIRE', KEYS[1], ARGV[2])
-  redis.call('SET', KEYS[2], '1', 'EX', ARGV[3])
-  return 1
-`;
-const CONSUME_OTP_SCRIPT = `
-  if redis.call('EXISTS', KEYS[1]) == 0 then
-    return 0
-  end
-  local storedDigest = redis.call('HGET', KEYS[1], 'digest')
-  local attempts = tonumber(redis.call('HGET', KEYS[1], 'attempts') or '0')
-  if storedDigest == ARGV[1] then
-    redis.call('DEL', KEYS[1])
-    return 1
-  end
-  attempts = attempts + 1
-  if attempts >= tonumber(ARGV[2]) then
-    redis.call('DEL', KEYS[1])
-  else
-    redis.call('HSET', KEYS[1], 'attempts', attempts)
-  end
-  return -1
-`;
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -84,17 +57,27 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     cooldownSeconds: number,
     replaceExisting: boolean,
   ): Promise<boolean> {
-    const result = await this.client.eval(
-      STORE_OTP_SCRIPT,
-      2,
-      this.otpKey(purpose, email),
-      this.otpCooldownKey(purpose, email),
-      digest,
-      String(ttlSeconds),
-      String(cooldownSeconds),
-      replaceExisting ? '1' : '0',
-    );
-    return Number(result) === 1;
+    const cooldownKey = this.otpCooldownKey(purpose, email);
+    if (replaceExisting) {
+      await this.client.set(cooldownKey, '1', 'EX', cooldownSeconds);
+    } else {
+      const stored = await this.client.set(
+        cooldownKey,
+        '1',
+        'EX',
+        cooldownSeconds,
+        'NX',
+      );
+      if (stored !== 'OK') return false;
+    }
+
+    const otpKey = this.otpKey(purpose, email);
+    await this.client
+      .multi()
+      .hset(otpKey, { digest, attempts: '0' })
+      .expire(otpKey, ttlSeconds)
+      .exec();
+    return true;
   }
 
   async consumeOtp(
@@ -103,17 +86,16 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     digest: string,
     maxAttempts: number,
   ): Promise<'valid' | 'invalid' | 'expired'> {
-    const result = Number(
-      await this.client.eval(
-        CONSUME_OTP_SCRIPT,
-        1,
-        this.otpKey(purpose, email),
-        digest,
-        String(maxAttempts),
-      ),
-    );
-    if (result === 1) return 'valid';
-    if (result === 0) return 'expired';
+    const otpKey = this.otpKey(purpose, email);
+    const storedDigest = await this.client.hget(otpKey, 'digest');
+    if (!storedDigest) return 'expired';
+    if (storedDigest === digest) {
+      await this.client.del(otpKey);
+      return 'valid';
+    }
+
+    const attempts = await this.client.hincrby(otpKey, 'attempts', 1);
+    if (attempts >= maxAttempts) await this.client.del(otpKey);
     return 'invalid';
   }
 
