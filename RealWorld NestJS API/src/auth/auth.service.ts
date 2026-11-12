@@ -31,6 +31,7 @@ import {
 } from './auth.dto';
 import { UsersService } from '../users/users.service';
 import { UserResponse, toAuthenticatedUser } from '../users/user-response';
+import { UpdateUserDto } from '../users/update-user.dto';
 import type {
   EmptyResponse,
   MessageResponse,
@@ -169,6 +170,23 @@ export class AuthService {
         await this.usersService.updatePassword(user, input.newPassword),
       ),
     };
+  }
+
+  async updateCurrentUser(
+    userId: string,
+    authorization: string | undefined,
+    input: UpdateUserDto,
+  ): Promise<UserEnvelopeResponse> {
+    const { user, hasPasswordChanged } = await this.usersService.update(
+      userId,
+      input,
+    );
+    if (hasPasswordChanged) return { user: await this.issueTokens(user) };
+
+    const token = authorization?.startsWith(AUTHORIZATION_SCHEME)
+      ? authorization.slice(AUTHORIZATION_SCHEME.length)
+      : '';
+    return { user: { ...toAuthenticatedUser(user), token } };
   }
 
   async logoutAll(payload: JwtPayload): Promise<EmptyResponse> {

@@ -8,17 +8,22 @@ import {
   Post,
   Put,
   Req,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiCreatedResponse,
   ApiOkResponse,
   ApiOperation,
   ApiSecurity,
+  ApiConsumes,
+  ApiBody,
   ApiTags,
 } from '@nestjs/swagger';
 import { AuthGuard } from '@nestjs/passport';
 import { ThrottlerGuard } from '@nestjs/throttler';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ChangePasswordEnvelope,
   EmailDto,
@@ -35,6 +40,13 @@ import type {
   MessageResponse,
   UserEnvelopeResponse,
 } from './auth.types';
+import { AvatarService } from '../users/avatar.service';
+import {
+  AVATAR_FIELD_NAME,
+  AVATAR_MAX_FILE_SIZE,
+  AVATAR_MIME_TYPES,
+} from '../users/avatar.constants';
+import { UpdateUserEnvelope } from '../users/update-user.dto';
 
 @ApiTags('Authentication')
 @Controller('users')
@@ -157,7 +169,10 @@ export class AuthController {
 @ApiTags('Users')
 @Controller('user')
 export class CurrentUserController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly avatarService: AvatarService,
+  ) {}
 
   @Get()
   @Header('Cache-Control', 'no-store')
@@ -170,6 +185,66 @@ export class CurrentUserController {
   getCurrentUser(
     @Req() request: AuthenticatedRequest,
   ): Promise<UserEnvelopeResponse> {
+    return this.authService.getCurrentUser(
+      request.user.sub,
+      request.headers.authorization,
+    );
+  }
+
+  @Put()
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiSecurity('TokenAuth')
+  @ApiOperation({ summary: 'Update the authenticated user' })
+  @ApiOkResponse({ description: 'Updated user.' })
+  updateCurrentUser(
+    @Req() request: AuthenticatedRequest,
+    @Body() body: UpdateUserEnvelope,
+  ): Promise<UserEnvelopeResponse> {
+    return this.authService.updateCurrentUser(
+      request.user.sub,
+      request.headers.authorization,
+      body.user,
+    );
+  }
+
+  @Post('avatar')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  @Header('Pragma', 'no-cache')
+  @Header('Expires', '0')
+  @UseGuards(AuthGuard('jwt'))
+  @UseInterceptors(
+    FileInterceptor(AVATAR_FIELD_NAME, {
+      limits: { fileSize: AVATAR_MAX_FILE_SIZE, files: 1 },
+      fileFilter: (_request, file, callback) => {
+        callback(
+          null,
+          AVATAR_MIME_TYPES.some((mimeType) => mimeType === file.mimetype),
+        );
+      },
+    }),
+  )
+  @ApiSecurity('TokenAuth')
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: [AVATAR_FIELD_NAME],
+      properties: {
+        [AVATAR_FIELD_NAME]: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @ApiOperation({ summary: 'Upload a JPEG, PNG, or WebP avatar (max 5 MiB)' })
+  @ApiOkResponse({ description: 'User with updated public avatar URL.' })
+  async uploadAvatar(
+    @Req() request: AuthenticatedRequest,
+    @UploadedFile() file?: Express.Multer.File,
+  ): Promise<UserEnvelopeResponse> {
+    await this.avatarService.upload(request.user.sub, file);
     return this.authService.getCurrentUser(
       request.user.sub,
       request.headers.authorization,

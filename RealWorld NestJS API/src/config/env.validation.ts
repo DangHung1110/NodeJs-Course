@@ -1,5 +1,6 @@
 export const DEFAULT_PORT = 3000;
 export const DEFAULT_API_PREFIX = 'api';
+export const DEFAULT_UPLOAD_DIRECTORY = 'uploads';
 
 export type NodeEnvironment = 'development' | 'test' | 'production';
 
@@ -30,6 +31,7 @@ export interface EnvironmentVariables extends DatabaseEnvironmentVariables {
   readonly OTP_EXPIRES_IN: number;
   readonly OTP_MAX_ATTEMPTS: number;
   readonly OTP_RESEND_COOLDOWN: number;
+  readonly UPLOAD_DIRECTORY: string;
 }
 
 const NODE_ENVIRONMENTS: readonly NodeEnvironment[] = [
@@ -107,6 +109,11 @@ export function validateEnvironment(
   const mailPassword = readString(config, 'MAIL_PASSWORD', '');
   const mailFrom = readString(config, 'MAIL_FROM', '');
   const otpSecret = readString(config, 'OTP_SECRET', '');
+  const uploadDirectory = readString(
+    config,
+    'UPLOAD_DIRECTORY',
+    DEFAULT_UPLOAD_DIRECTORY,
+  );
 
   if (jwtSecret.length < 32) {
     throw new EnvironmentValidationError(
@@ -210,6 +217,7 @@ export function validateEnvironment(
     OTP_EXPIRES_IN: otpExpiresIn,
     OTP_MAX_ATTEMPTS: otpMaxAttempts,
     OTP_RESEND_COOLDOWN: otpResendCooldown,
+    UPLOAD_DIRECTORY: uploadDirectory,
   };
 }
 

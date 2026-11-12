@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { RedisModule } from './auth/redis.module';
 import { DatabaseModule } from './database/database.module';
 import { HelloModule } from './hello/hello.module';
+import { ProfilesModule } from './profiles/profiles.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { HelloModule } from './hello/hello.module';
     DatabaseModule,
     RedisModule,
     AuthModule,
+    ProfilesModule,
     HelloModule,
   ],
 })
