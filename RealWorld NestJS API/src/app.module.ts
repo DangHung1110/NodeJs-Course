@@ -3,6 +3,9 @@ import { ConfigModule } from '@nestjs/config';
 import { join } from 'node:path';
 import { AcceptLanguageResolver, I18nModule } from 'nestjs-i18n';
 import { validateEnvironment } from './config/env.validation';
+import { AuthModule } from './auth/auth.module';
+import { RedisModule } from './auth/redis.module';
+import { DatabaseModule } from './database/database.module';
 import { HelloModule } from './hello/hello.module';
 
 @Module({
@@ -21,6 +24,9 @@ import { HelloModule } from './hello/hello.module';
       },
       resolvers: [AcceptLanguageResolver],
     }),
+    DatabaseModule,
+    RedisModule,
+    AuthModule,
     HelloModule,
   ],
 })
