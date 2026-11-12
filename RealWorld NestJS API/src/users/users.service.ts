@@ -8,6 +8,7 @@ import { hash } from 'bcryptjs';
 import { Repository } from 'typeorm';
 import { RegisterUserDto } from '../auth/auth.dto';
 import { UserEntity } from '../database/entities/user.entity';
+import { UpdateUserDto } from './update-user.dto';
 
 const DUPLICATE_KEY_CODE = 'ER_DUP_ENTRY';
 const USER_WITH_PASSWORD = [
@@ -89,6 +90,44 @@ export class UsersService {
     user.passwordHash = await hash(password, 12);
     user.tokenVersion += 1;
     return this.usersRepository.save(user);
+  }
+
+  async update(
+    userId: string,
+    input: UpdateUserDto,
+  ): Promise<{ user: UserEntity; hasPasswordChanged: boolean }> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new UnprocessableEntityException({
+        errors: { user: ['User no longer exists.'] },
+      });
+    }
+
+    if (input.username !== undefined) user.username = input.username;
+    if (input.email !== undefined) user.email = input.email;
+    if (input.bio !== undefined) user.bio = input.bio;
+
+    const hasPasswordChanged = input.password !== undefined;
+    if (input.password !== undefined) {
+      user.passwordHash = await hash(input.password, 12);
+      user.tokenVersion += 1;
+    }
+
+    try {
+      return {
+        user: await this.usersRepository.save(user),
+        hasPasswordChanged,
+      };
+    } catch (error) {
+      if (isDuplicateKeyError(error)) {
+        throw new UnprocessableEntityException({
+          errors: { body: ['Username or email is already taken.'] },
+        });
+      }
+      throw new InternalServerErrorException('Unable to update account.', {
+        cause: error,
+      });
+    }
   }
 
   async incrementTokenVersion(user: UserEntity): Promise<UserEntity> {

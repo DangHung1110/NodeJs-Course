@@ -53,6 +53,7 @@ export function configureSwagger(app: INestApplication): void {
     .addTag('Hello', 'Localized hello endpoint.')
     .addTag('Authentication', 'Register, login, and logout.')
     .addTag('Users', 'Authenticated user endpoints.')
+    .addTag('Profiles', 'Public profiles and follow relationships.')
     .addApiKey(
       { type: 'apiKey', in: 'header', name: 'Authorization' },
       'TokenAuth',
