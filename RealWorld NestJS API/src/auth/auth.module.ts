@@ -9,9 +9,7 @@ import { AuthController, CurrentUserController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
 import { OtpService } from './otp.service';
-
-const LOGIN_THROTTLE_TTL_MS = 60_000;
-const LOGIN_THROTTLE_LIMIT = 10;
+import { LOGIN_THROTTLE_LIMIT, LOGIN_THROTTLE_TTL_MS } from './auth.constants';
 
 @Module({
   imports: [

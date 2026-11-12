@@ -10,9 +10,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-
-const normalizeEmail = ({ value }: { value: unknown }): unknown =>
-  typeof value === 'string' ? value.trim().toLowerCase() : value;
+import { normalizeEmailValue } from './auth.constants';
 
 export class RegisterUserDto {
   @ApiProperty({ example: 'jane_doe', minLength: 1, maxLength: 50 })
@@ -25,7 +23,7 @@ export class RegisterUserDto {
   username!: string;
 
   @ApiProperty({ example: 'jane@example.com', maxLength: 254 })
-  @Transform(normalizeEmail)
+  @Transform(normalizeEmailValue)
   @IsEmail()
   @MaxLength(254)
   email!: string;
@@ -38,7 +36,7 @@ export class RegisterUserDto {
 
 export class LoginUserDto {
   @ApiProperty({ example: 'jane@example.com', maxLength: 254 })
-  @Transform(normalizeEmail)
+  @Transform(normalizeEmailValue)
   @IsEmail()
   @MaxLength(254)
   email!: string;
@@ -51,7 +49,7 @@ export class LoginUserDto {
 
 export class EmailDto {
   @ApiProperty({ example: 'jane@example.com', maxLength: 254 })
-  @Transform(normalizeEmail)
+  @Transform(normalizeEmailValue)
   @IsEmail()
   @MaxLength(254)
   email!: string;

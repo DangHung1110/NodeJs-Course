@@ -7,6 +7,14 @@ import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { randomUUID } from 'node:crypto';
 import { compare } from 'bcryptjs';
+import {
+  AUTHORIZATION_SCHEME,
+  DUMMY_PASSWORD_HASH,
+  FORGOT_PASSWORD_MESSAGE,
+  REGISTER_SUCCESS_MESSAGE,
+  RESEND_VERIFICATION_MESSAGE,
+  RESET_PASSWORD_SUCCESS_MESSAGE,
+} from './auth.constants';
 import { JwtPayload, RefreshTokenPayload } from './jwt-payload';
 import { RedisService } from './redis.service';
 import { OtpPurpose, OtpService } from './otp.service';
@@ -23,9 +31,11 @@ import {
 } from './auth.dto';
 import { UsersService } from '../users/users.service';
 import { UserResponse, toAuthenticatedUser } from '../users/user-response';
-
-const DUMMY_PASSWORD_HASH =
-  '$2b$12$ev5QisFPq.GTr8lBXyrRn.AYekKD3dnwwJ124UMocd1YQFtkF49eC';
+import type {
+  EmptyResponse,
+  MessageResponse,
+  UserEnvelopeResponse,
+} from './auth.types';
 
 @Injectable()
 export class AuthService {
@@ -50,12 +60,13 @@ export class AuthService {
       configService.getOrThrow<string>('JWT_REFRESH_SECRET');
   }
 
-  async register(input: RegisterUserDto): Promise<void> {
+  async register(input: RegisterUserDto): Promise<MessageResponse> {
     const user = await this.usersService.create(input);
     await this.sendOtp('email-verification', user.email, true);
+    return { message: REGISTER_SUCCESS_MESSAGE };
   }
 
-  async login(input: LoginUserDto): Promise<UserResponse> {
+  async login(input: LoginUserDto): Promise<UserEnvelopeResponse> {
     const user = await this.usersService.findByEmail(input.email);
     if (
       !user?.isActive ||
@@ -66,40 +77,49 @@ export class AuthService {
     if (!user.emailVerifiedAt) {
       throw new UnauthorizedException('Email verification is required.');
     }
-    return this.issueTokens(user);
+    return { user: await this.issueTokens(user) };
   }
 
-  async verifyEmail(input: VerifyEmailDto): Promise<UserResponse> {
+  async verifyEmail(input: VerifyEmailDto): Promise<UserEnvelopeResponse> {
     await this.otpService.consume('email-verification', input.email, input.otp);
     const user = await this.usersService.findByEmail(input.email);
     if (!user?.isActive || user.emailVerifiedAt) {
       throw new UnauthorizedException('Invalid or expired verification code.');
     }
-    return this.issueTokens(await this.usersService.markEmailVerified(user));
+    return {
+      user: await this.issueTokens(
+        await this.usersService.markEmailVerified(user),
+      ),
+    };
   }
 
-  async resendVerification(input: EmailDto): Promise<void> {
+  async resendVerification(input: EmailDto): Promise<MessageResponse> {
     const user = await this.usersService.findByEmail(input.email);
-    if (!user?.isActive || user.emailVerifiedAt) return;
-    await this.sendOtp('email-verification', user.email);
+    if (user?.isActive && !user.emailVerifiedAt) {
+      await this.sendOtp('email-verification', user.email);
+    }
+    return { message: RESEND_VERIFICATION_MESSAGE };
   }
 
-  async forgotPassword(input: EmailDto): Promise<void> {
+  async forgotPassword(input: EmailDto): Promise<MessageResponse> {
     const user = await this.usersService.findByEmail(input.email);
-    if (!user?.isActive || !user.emailVerifiedAt) return;
-    await this.sendOtp('password-reset', user.email);
+    if (user?.isActive && user.emailVerifiedAt) {
+      await this.sendOtp('password-reset', user.email);
+    }
+    return { message: FORGOT_PASSWORD_MESSAGE };
   }
 
-  async resetPassword(input: ResetPasswordDto): Promise<void> {
+  async resetPassword(input: ResetPasswordDto): Promise<MessageResponse> {
     await this.otpService.consume('password-reset', input.email, input.otp);
     const user = await this.usersService.findByEmail(input.email);
     if (!user?.isActive || !user.emailVerifiedAt) {
       throw new UnauthorizedException('Invalid or expired verification code.');
     }
     await this.usersService.updatePassword(user, input.newPassword);
+    return { message: RESET_PASSWORD_SUCCESS_MESSAGE };
   }
 
-  async refresh(input: RefreshTokenDto): Promise<UserResponse> {
+  async refresh(input: RefreshTokenDto): Promise<UserEnvelopeResponse> {
     const payload = await this.verifyRefreshToken(input.refreshToken);
     const user = await this.usersService.findById(payload.sub);
     if (
@@ -114,21 +134,27 @@ export class AuthService {
     const revoked = await this.revokeToken(payload, true);
     if (!revoked) this.invalidRefreshToken();
 
-    return this.issueTokens(user);
+    return { user: await this.issueTokens(user) };
   }
 
-  async getCurrentUser(userId: string, token: string): Promise<UserResponse> {
+  async getCurrentUser(
+    userId: string,
+    authorization?: string,
+  ): Promise<UserEnvelopeResponse> {
     const user = await this.usersService.findById(userId);
     if (!user?.isActive || !user.emailVerifiedAt) {
       throw new UnauthorizedException();
     }
-    return { ...toAuthenticatedUser(user), token };
+    const token = authorization?.startsWith(AUTHORIZATION_SCHEME)
+      ? authorization.slice(AUTHORIZATION_SCHEME.length)
+      : '';
+    return { user: { ...toAuthenticatedUser(user), token } };
   }
 
   async changePassword(
     userId: string,
     input: ChangePasswordDto,
-  ): Promise<UserResponse> {
+  ): Promise<UserEnvelopeResponse> {
     const user = await this.usersService.findByIdWithPassword(userId);
     if (
       !user?.isActive ||
@@ -138,20 +164,24 @@ export class AuthService {
       throw new UnauthorizedException('Current password is invalid.');
     }
 
-    return this.issueTokens(
-      await this.usersService.updatePassword(user, input.newPassword),
-    );
+    return {
+      user: await this.issueTokens(
+        await this.usersService.updatePassword(user, input.newPassword),
+      ),
+    };
   }
 
-  async logoutAll(payload: JwtPayload): Promise<void> {
+  async logoutAll(payload: JwtPayload): Promise<EmptyResponse> {
     const user = await this.usersService.findById(payload.sub);
     if (!user?.isActive) throw new UnauthorizedException();
     await this.usersService.incrementTokenVersion(user);
     await this.logout(payload);
+    return {};
   }
 
-  async logout(payload: JwtPayload): Promise<void> {
+  async logout(payload: JwtPayload): Promise<EmptyResponse> {
     await this.revokeToken(payload);
+    return {};
   }
 
   private async issueTokens(user: UserEntity): Promise<UserResponse> {

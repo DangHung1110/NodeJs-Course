@@ -6,11 +6,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { AUTHORIZATION_SCHEME } from './auth.constants';
 import { JwtPayload } from './jwt-payload';
 import { RedisService } from './redis.service';
 import { UsersService } from '../users/users.service';
-
-const AUTHORIZATION_SCHEME = 'Token ';
 
 function extractTokenFromAuthorizationHeader(request: {
   headers?: { authorization?: string };

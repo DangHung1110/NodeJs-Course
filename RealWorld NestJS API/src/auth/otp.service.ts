@@ -5,11 +5,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, randomInt } from 'node:crypto';
+import { normalizeEmail, OTP_UPPER_BOUND } from './auth.constants';
 import { RedisService } from './redis.service';
 
 export type OtpPurpose = 'email-verification' | 'password-reset';
-
-const OTP_UPPER_BOUND = 1_000_000;
 
 @Injectable()
 export class OtpService {
@@ -35,7 +34,7 @@ export class OtpService {
     email: string,
     replaceExisting = false,
   ): Promise<string | null> {
-    const normalizedEmail = this.normalizeEmail(email);
+    const normalizedEmail = normalizeEmail(email);
     const otp = randomInt(0, OTP_UPPER_BOUND).toString().padStart(6, '0');
     try {
       const stored = await this.redisService.storeOtp(
@@ -60,7 +59,7 @@ export class OtpService {
     email: string,
     otp: string,
   ): Promise<void> {
-    const normalizedEmail = this.normalizeEmail(email);
+    const normalizedEmail = normalizeEmail(email);
     let result: 'valid' | 'invalid' | 'expired';
     try {
       result = await this.redisService.consumeOtp(
@@ -82,7 +81,7 @@ export class OtpService {
 
   async clear(purpose: OtpPurpose, email: string): Promise<void> {
     try {
-      await this.redisService.deleteOtp(purpose, this.normalizeEmail(email));
+      await this.redisService.deleteOtp(purpose, normalizeEmail(email));
     } catch (error) {
       throw new ServiceUnavailableException(
         'Verification codes are temporarily unavailable.',
@@ -99,9 +98,5 @@ export class OtpService {
       .update(':')
       .update(otp)
       .digest('hex');
-  }
-
-  private normalizeEmail(email: string): string {
-    return email.trim().toLowerCase();
   }
 }

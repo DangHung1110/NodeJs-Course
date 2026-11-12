@@ -1,9 +1,10 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
-
-const RETRY_STEP_MS = 100;
-const RETRY_MAX_DELAY_MS = 2_000;
+import {
+  REDIS_RETRY_MAX_DELAY_MS,
+  REDIS_RETRY_STEP_MS,
+} from './auth.constants';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -16,7 +17,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
       lazyConnect: true,
       maxRetriesPerRequest: 1,
       retryStrategy: (attempt) =>
-        Math.min(attempt * RETRY_STEP_MS, RETRY_MAX_DELAY_MS),
+        Math.min(attempt * REDIS_RETRY_STEP_MS, REDIS_RETRY_MAX_DELAY_MS),
     });
   }
 
