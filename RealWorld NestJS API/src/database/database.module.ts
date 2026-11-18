@@ -2,8 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserEntity } from './entities/user.entity';
+import { AttachmentEntity } from './entities/attachment.entity';
+import { FollowEntity } from './entities/follow.entity';
 import { CreateUsers1731100000000 } from './migrations/1731100000000-CreateUsers';
 import { AddAuthVerificationFields1731200000000 } from './migrations/1731200000000-AddAuthVerificationFields';
+import { AddFollowsAndAttachments1731300000000 } from './migrations/1731300000000-AddFollowsAndAttachments';
 
 @Module({
   imports: [
@@ -16,10 +19,11 @@ import { AddAuthVerificationFields1731200000000 } from './migrations/17312000000
         username: configService.getOrThrow<string>('DB_USERNAME'),
         password: configService.getOrThrow<string>('DB_PASSWORD'),
         database: configService.getOrThrow<string>('DB_DATABASE'),
-        entities: [UserEntity],
+        entities: [UserEntity, FollowEntity, AttachmentEntity],
         migrations: [
           CreateUsers1731100000000,
           AddAuthVerificationFields1731200000000,
+          AddFollowsAndAttachments1731300000000,
         ],
         migrationsTableName: 'typeorm_migrations',
         synchronize: false,
