@@ -10,6 +10,7 @@ describe('UsersService update', () => {
     email: 'before@example.com',
     bio: null,
     tokenVersion: 0,
+    emailVerifiedAt: new Date('2026-01-01T00:00:00.000Z'),
   } as UserEntity;
   let repository: Pick<Repository<UserEntity>, 'findOne' | 'save'>;
   let service: UsersService;
@@ -27,10 +28,31 @@ describe('UsersService update', () => {
   it('updates only provided profile fields', async () => {
     const result = await service.update('user-id', { bio: 'new bio' });
     expect(result).toMatchObject({
-      hasPasswordChanged: false,
+      hasEmailChanged: false,
       user: { bio: 'new bio' },
     });
     expect(result.user.username).toBe('before');
+  });
+
+  it('requires verification again when the email changes', async () => {
+    const result = await service.update('user-id', {
+      email: 'after@example.com',
+    });
+
+    expect(result.hasEmailChanged).toBe(true);
+    expect(result.user.email).toBe('after@example.com');
+    expect(result.user.emailVerifiedAt).toBeNull();
+  });
+
+  it('keeps verification when the email value is unchanged', async () => {
+    const result = await service.update('user-id', {
+      email: 'before@example.com',
+    });
+
+    expect(result.hasEmailChanged).toBe(false);
+    expect(result.user.emailVerifiedAt).toEqual(
+      new Date('2026-01-01T00:00:00.000Z'),
+    );
   });
 
   it('maps duplicate username or email to validation error', async () => {

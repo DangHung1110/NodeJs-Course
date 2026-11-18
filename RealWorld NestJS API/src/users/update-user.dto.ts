@@ -5,7 +5,6 @@ import {
   IsEmail,
   IsOptional,
   IsString,
-  Length,
   MaxLength,
   MinLength,
   ValidateNested,
@@ -29,12 +28,6 @@ export class UpdateUserDto {
   @IsEmail()
   @MaxLength(254)
   email?: string;
-
-  @ApiPropertyOptional({ minLength: 8, maxLength: 72 })
-  @IsOptional()
-  @IsString()
-  @Length(8, 72)
-  password?: string;
 
   @ApiPropertyOptional({ nullable: true, maxLength: 2000 })
   @IsOptional()

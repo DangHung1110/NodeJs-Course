@@ -4,8 +4,10 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'node:path';
 import { AppModule } from './app.module';
 import { configureApp } from './app.setup';
-import { DEFAULT_PORT } from './config/env.validation';
-import { DEFAULT_UPLOAD_DIRECTORY } from './config/env.validation';
+import {
+  DEFAULT_PORT,
+  DEFAULT_UPLOAD_DIRECTORY,
+} from './config/env.validation';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);

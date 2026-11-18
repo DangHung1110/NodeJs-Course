@@ -74,6 +74,25 @@ describe('AvatarService', () => {
     expect(attachments.save).not.toHaveBeenCalled();
   });
 
+  it('reports an unsupported GIF as an invalid image format', async () => {
+    const error = await service
+      .upload('user-id', {
+        buffer: Buffer.from('GIF89a', 'ascii'),
+        mimetype: 'image/gif',
+        originalname: 'avatar.gif',
+        size: 6,
+      })
+      .catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(UnprocessableEntityException);
+    if (!(error instanceof UnprocessableEntityException)) return;
+    expect(error.getResponse()).toEqual({
+      errors: {
+        avatar: ['Avatar must be a valid JPEG, PNG, or WebP image.'],
+      },
+    });
+  });
+
   it('stores a validated PNG with a generated public URL', async () => {
     const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
     const result = await service.upload('user-id', {

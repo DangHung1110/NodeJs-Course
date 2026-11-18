@@ -8,9 +8,10 @@ import { hash } from 'bcryptjs';
 import { Repository } from 'typeorm';
 import { RegisterUserDto } from '../auth/auth.dto';
 import { UserEntity } from '../database/entities/user.entity';
+import { isDuplicateKeyError } from '../database/mysql-error.util';
 import { UpdateUserDto } from './update-user.dto';
+import { PASSWORD_HASH_ROUNDS } from './users.constants';
 
-const DUPLICATE_KEY_CODE = 'ER_DUP_ENTRY';
 const USER_WITH_PASSWORD = [
   'id',
   'username',
@@ -23,18 +24,6 @@ const USER_WITH_PASSWORD = [
   'emailVerifiedAt',
 ] as (keyof UserEntity)[];
 
-function isDuplicateKeyError(error: unknown): boolean {
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'driverError' in error &&
-    typeof error.driverError === 'object' &&
-    error.driverError !== null &&
-    'code' in error.driverError &&
-    error.driverError.code === DUPLICATE_KEY_CODE
-  );
-}
-
 @Injectable()
 export class UsersService {
   constructor(
@@ -46,7 +35,7 @@ export class UsersService {
     const user = this.usersRepository.create({
       username: input.username.trim(),
       email: input.email.trim().toLowerCase(),
-      passwordHash: await hash(input.password, 12),
+      passwordHash: await hash(input.password, PASSWORD_HASH_ROUNDS),
       bio: null,
       image: null,
     });
@@ -87,7 +76,7 @@ export class UsersService {
     user: UserEntity,
     password: string,
   ): Promise<UserEntity> {
-    user.passwordHash = await hash(password, 12);
+    user.passwordHash = await hash(password, PASSWORD_HASH_ROUNDS);
     user.tokenVersion += 1;
     return this.usersRepository.save(user);
   }
@@ -95,7 +84,7 @@ export class UsersService {
   async update(
     userId: string,
     input: UpdateUserDto,
-  ): Promise<{ user: UserEntity; hasPasswordChanged: boolean }> {
+  ): Promise<{ user: UserEntity; hasEmailChanged: boolean }> {
     const user = await this.findById(userId);
     if (!user) {
       throw new UnprocessableEntityException({
@@ -104,19 +93,18 @@ export class UsersService {
     }
 
     if (input.username !== undefined) user.username = input.username;
-    if (input.email !== undefined) user.email = input.email;
-    if (input.bio !== undefined) user.bio = input.bio;
-
-    const hasPasswordChanged = input.password !== undefined;
-    if (input.password !== undefined) {
-      user.passwordHash = await hash(input.password, 12);
-      user.tokenVersion += 1;
+    const hasEmailChanged =
+      input.email !== undefined && input.email !== user.email;
+    if (input.email !== undefined && input.email !== user.email) {
+      user.email = input.email;
+      user.emailVerifiedAt = null;
     }
+    if (input.bio !== undefined) user.bio = input.bio;
 
     try {
       return {
         user: await this.usersRepository.save(user),
-        hasPasswordChanged,
+        hasEmailChanged,
       };
     } catch (error) {
       if (isDuplicateKeyError(error)) {

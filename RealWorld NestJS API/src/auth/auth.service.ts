@@ -177,11 +177,13 @@ export class AuthService {
     authorization: string | undefined,
     input: UpdateUserDto,
   ): Promise<UserEnvelopeResponse> {
-    const { user, hasPasswordChanged } = await this.usersService.update(
+    const { user, hasEmailChanged } = await this.usersService.update(
       userId,
       input,
     );
-    if (hasPasswordChanged) return { user: await this.issueTokens(user) };
+    if (hasEmailChanged) {
+      await this.sendOtp('email-verification', user.email, true);
+    }
 
     const token = authorization?.startsWith(AUTHORIZATION_SCHEME)
       ? authorization.slice(AUTHORIZATION_SCHEME.length)

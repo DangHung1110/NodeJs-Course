@@ -44,7 +44,6 @@ import { AvatarService } from '../users/avatar.service';
 import {
   AVATAR_FIELD_NAME,
   AVATAR_MAX_FILE_SIZE,
-  AVATAR_MIME_TYPES,
 } from '../users/avatar.constants';
 import { UpdateUserEnvelope } from '../users/update-user.dto';
 
@@ -219,12 +218,6 @@ export class CurrentUserController {
   @UseInterceptors(
     FileInterceptor(AVATAR_FIELD_NAME, {
       limits: { fileSize: AVATAR_MAX_FILE_SIZE, files: 1 },
-      fileFilter: (_request, file, callback) => {
-        callback(
-          null,
-          AVATAR_MIME_TYPES.some((mimeType) => mimeType === file.mimetype),
-        );
-      },
     }),
   )
   @ApiSecurity('TokenAuth')

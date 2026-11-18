@@ -144,6 +144,15 @@ describe('PR-03 HTTP contract', () => {
       .expect(422);
   });
 
+  it('rejects password changes through the profile update endpoint', async () => {
+    await request(server)
+      .put('/api/user')
+      .set('Authorization', 'Token test')
+      .send({ user: { password: 'new-password' } })
+      .expect(422);
+    expect(authService.updateCurrentUser).not.toHaveBeenCalled();
+  });
+
   it('returns a public profile without authentication', async () => {
     await request(server)
       .get('/api/profiles/target')
