@@ -55,6 +55,8 @@ export function configureSwagger(app: INestApplication): void {
     .addTag('Users', 'Authenticated user endpoints.')
     .addTag('Profiles', 'Public profiles and follow relationships.')
     .addTag('Articles', 'Article management, feeds, tags, and favorites.')
+    .addTag('Comments', 'Article comments and author-only deletion.')
+    .addTag('Tags', 'Public tag listing.')
     .addApiKey(
       { type: 'apiKey', in: 'header', name: 'Authorization' },
       'TokenAuth',
