@@ -9,6 +9,8 @@ import { DatabaseModule } from './database/database.module';
 import { HelloModule } from './hello/hello.module';
 import { ProfilesModule } from './profiles/profiles.module';
 import { ArticlesModule } from './articles/articles.module';
+import { CommentsModule } from './comments/comments.module';
+import { TagsModule } from './tags/tags.module';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { ArticlesModule } from './articles/articles.module';
     AuthModule,
     ProfilesModule,
     ArticlesModule,
+    CommentsModule,
+    TagsModule,
     HelloModule,
   ],
 })
