@@ -20,6 +20,7 @@
     "test": "jest --runInBand",
     "test:unit": "jest --runInBand --selectProjects unit",
     "test:e2e": "jest --runInBand --selectProjects e2e",
+    "test:integration": "jest --runInBand --selectProjects integration",
     "migration:create": "typeorm migration:create",
     "migration:generate": "npm run build && typeorm migration:generate",
     "migration:run": "npm run build && typeorm migration:run -d dist/database/data-source.js",
@@ -80,6 +81,27 @@
         "rootDir": ".",
         "testMatch": [
           "<rootDir>/tests/e2e/**/*.test.ts"
+        ],
+        "transform": {
+          "^.+\\.ts$": [
+            "ts-jest",
+            {
+              "tsconfig": "tsconfig.json"
+            }
+          ]
+        },
+        "moduleFileExtensions": [
+          "ts",
+          "js",
+          "json"
+        ]
+      },
+      {
+        "displayName": "integration",
+        "testEnvironment": "node",
+        "rootDir": ".",
+        "testMatch": [
+          "<rootDir>/tests/integration/**/*.test.ts"
         ],
         "transform": {
           "^.+\\.ts$": [

@@ -54,6 +54,7 @@ export function configureSwagger(app: INestApplication): void {
     .addTag('Authentication', 'Register, login, and logout.')
     .addTag('Users', 'Authenticated user endpoints.')
     .addTag('Profiles', 'Public profiles and follow relationships.')
+    .addTag('Articles', 'Article management, feeds, tags, and favorites.')
     .addApiKey(
       { type: 'apiKey', in: 'header', name: 'Authorization' },
       'TokenAuth',

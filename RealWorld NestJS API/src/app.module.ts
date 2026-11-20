@@ -8,6 +8,7 @@ import { RedisModule } from './auth/redis.module';
 import { DatabaseModule } from './database/database.module';
 import { HelloModule } from './hello/hello.module';
 import { ProfilesModule } from './profiles/profiles.module';
+import { ArticlesModule } from './articles/articles.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { ProfilesModule } from './profiles/profiles.module';
     RedisModule,
     AuthModule,
     ProfilesModule,
+    ArticlesModule,
     HelloModule,
   ],
 })
