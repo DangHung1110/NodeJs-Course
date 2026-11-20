@@ -44,6 +44,14 @@ describe('ArticlesService', () => {
     Repository<TagEntity>,
     'createQueryBuilder' | 'findBy'
   >;
+  let tagInsertBuilder: {
+    insert: jest.Mock;
+    into: jest.Mock;
+    values: jest.Mock;
+    orIgnore: jest.Mock;
+    execute: jest.Mock;
+  };
+  let insertedTagNames: string[];
   let favoriteRepository: Pick<Repository<FavoriteEntity>, 'insert' | 'delete'>;
   let manager: Pick<EntityManager, 'getRepository'>;
   let dataSource: Pick<DataSource, 'transaction' | 'getRepository'>;
@@ -76,10 +84,14 @@ describe('ArticlesService', () => {
         .fn()
         .mockResolvedValue({ identifiers: [], generatedMaps: [], raw: [] }),
     };
-    const tagInsertBuilder = {
+    insertedTagNames = [];
+    tagInsertBuilder = {
       insert: jest.fn().mockReturnThis(),
       into: jest.fn().mockReturnThis(),
-      values: jest.fn().mockReturnThis(),
+      values: jest.fn((values: Array<{ id: string; name: string }>) => {
+        insertedTagNames = values.map(({ name }) => name);
+        return tagInsertBuilder;
+      }),
       orIgnore: jest.fn().mockReturnThis(),
       execute: jest.fn().mockResolvedValue({ identifiers: [] }),
     };
@@ -105,8 +117,16 @@ describe('ArticlesService', () => {
       }) as EntityManager['getRepository'],
     };
     dataSource = {
-      transaction: jest.fn((run: (value: EntityManager) => unknown) =>
-        run(manager as EntityManager),
+      transaction: jest.fn(
+        (
+          isolationOrRun: string | ((value: EntityManager) => unknown),
+          maybeRun?: (value: EntityManager) => unknown,
+        ) => {
+          const run =
+            typeof isolationOrRun === 'function' ? isolationOrRun : maybeRun;
+          if (!run) throw new Error('Transaction callback is required.');
+          return run(manager as EntityManager);
+        },
       ) as DataSource['transaction'],
       getRepository: jest.fn((entity: unknown) => {
         if (entity === ArticleEntity) return articleRepository;
@@ -163,6 +183,32 @@ describe('ArticlesService', () => {
     ).resolves.toEqual(response);
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(2);
+  });
+
+  it('queries missing tags in sorted order and retries a deadlock', async () => {
+    jest
+      .mocked(tagRepository.findBy)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        { id: 'tag-id-1', name: 'nestjs' },
+        { id: 'tag-id-2', name: 'typescript' },
+      ]);
+    tagInsertBuilder.execute
+      .mockRejectedValueOnce({ driverError: { code: 'ER_LOCK_DEADLOCK' } })
+      .mockResolvedValueOnce({ identifiers: [] });
+
+    await expect(
+      service.create('author-id', {
+        title: 'Article',
+        description: 'Description',
+        body: 'Body',
+        tagList: ['typescript', 'nestjs'],
+      }),
+    ).resolves.toEqual(response);
+
+    expect(dataSource.transaction).toHaveBeenCalledTimes(2);
+    expect(insertedTagNames).toEqual(['nestjs', 'typescript']);
   });
 
   it('rejects a non-author update without changing relations', async () => {
@@ -234,5 +280,15 @@ describe('ArticlesService', () => {
     await expect(
       service.favorite('article-123', 'viewer-id'),
     ).rejects.toBeInstanceOf(InternalServerErrorException);
+  });
+
+  it('returns not found when an article is deleted during favorite', async () => {
+    jest.mocked(favoriteRepository.insert).mockRejectedValueOnce({
+      driverError: { code: 'ER_NO_REFERENCED_ROW_2' },
+    });
+
+    await expect(
+      service.favorite('article-123', 'viewer-id'),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

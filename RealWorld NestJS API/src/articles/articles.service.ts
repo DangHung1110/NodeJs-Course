@@ -10,9 +10,13 @@ import { ArticleEntity } from '../database/entities/article.entity';
 import { ArticleTagEntity } from '../database/entities/article-tag.entity';
 import { FavoriteEntity } from '../database/entities/favorite.entity';
 import { TagEntity } from '../database/entities/tag.entity';
-import { isDuplicateKeyError } from '../database/mysql-error.util';
+import {
+  isDeadlockError,
+  isDuplicateKeyError,
+  isMissingForeignKeyError,
+} from '../database/mysql-error.util';
 import { ArticleQueryService } from './article-query.service';
-import { SLUG_CREATE_ATTEMPTS } from './article.constants';
+import { ARTICLE_TRANSACTION_ATTEMPTS } from './article.constants';
 import {
   CreateArticleDto,
   ListArticlesQueryDto,
@@ -42,30 +46,47 @@ export class ArticlesService {
     authorId: string,
     input: CreateArticleDto,
   ): Promise<ArticleEnvelopeResponse> {
-    for (let attempt = 0; attempt < SLUG_CREATE_ATTEMPTS; attempt += 1) {
+    let lastRetryableError: unknown;
+    for (
+      let attempt = 0;
+      attempt < ARTICLE_TRANSACTION_ATTEMPTS;
+      attempt += 1
+    ) {
       try {
-        const slug = await this.dataSource.transaction(async (manager) => {
-          const articles = manager.getRepository(ArticleEntity);
-          const article = articles.create({
-            slug: createArticleSlug(input.title),
-            title: input.title,
-            description: input.description,
-            body: input.body,
-            authorId,
-          });
-          try {
-            await articles.save(article);
-          } catch (error) {
-            if (isDuplicateKeyError(error)) throw new SlugCollisionError();
-            throw error;
-          }
-          await this.replaceTags(manager, article.id, input.tagList ?? []);
-          return article.slug;
-        });
+        const slug = await this.dataSource.transaction(
+          'READ COMMITTED',
+          async (manager) => {
+            const articles = manager.getRepository(ArticleEntity);
+            const article = articles.create({
+              slug: createArticleSlug(input.title),
+              title: input.title,
+              description: input.description,
+              body: input.body,
+              authorId,
+            });
+            try {
+              await articles.save(article);
+            } catch (error) {
+              if (isDuplicateKeyError(error)) throw new SlugCollisionError();
+              throw error;
+            }
+            await this.replaceTags(manager, article.id, input.tagList ?? []);
+            return article.slug;
+          },
+        );
         return this.articleQueryService.findBySlug(slug, authorId);
       } catch (error) {
-        if (!(error instanceof SlugCollisionError)) throw error;
+        if (!(error instanceof SlugCollisionError) && !isDeadlockError(error)) {
+          throw error;
+        }
+        lastRetryableError = error;
       }
+    }
+    if (isDeadlockError(lastRetryableError)) {
+      throw new InternalServerErrorException(
+        'Unable to create article after concurrent database updates.',
+        { cause: lastRetryableError },
+      );
     }
     throw new InternalServerErrorException(
       'Unable to generate a unique article slug.',
@@ -95,9 +116,15 @@ export class ArticlesService {
     authorId: string,
     input: UpdateArticleDto,
   ): Promise<ArticleEnvelopeResponse> {
-    for (let attempt = 0; attempt < SLUG_CREATE_ATTEMPTS; attempt += 1) {
+    let lastRetryableError: unknown;
+    for (
+      let attempt = 0;
+      attempt < ARTICLE_TRANSACTION_ATTEMPTS;
+      attempt += 1
+    ) {
       try {
         const updatedSlug = await this.dataSource.transaction(
+          'READ COMMITTED',
           async (manager) => {
             const articles = manager.getRepository(ArticleEntity);
             const article = await articles.findOne({
@@ -130,8 +157,17 @@ export class ArticlesService {
         );
         return this.articleQueryService.findBySlug(updatedSlug, authorId);
       } catch (error) {
-        if (!(error instanceof SlugCollisionError)) throw error;
+        if (!(error instanceof SlugCollisionError) && !isDeadlockError(error)) {
+          throw error;
+        }
+        lastRetryableError = error;
       }
+    }
+    if (isDeadlockError(lastRetryableError)) {
+      throw new InternalServerErrorException(
+        'Unable to update article after concurrent database updates.',
+        { cause: lastRetryableError },
+      );
     }
     throw new InternalServerErrorException(
       'Unable to generate a unique article slug.',
@@ -162,6 +198,9 @@ export class ArticlesService {
         articleId: article.id,
       });
     } catch (error) {
+      if (isMissingForeignKeyError(error)) {
+        throw new NotFoundException('Article not found.');
+      }
       if (!isDuplicateKeyError(error)) {
         throw new InternalServerErrorException('Unable to favorite article.', {
           cause: error,
@@ -193,14 +232,27 @@ export class ArticlesService {
     if (names.length === 0) return;
 
     const tags = manager.getRepository(TagEntity);
-    await tags
-      .createQueryBuilder()
-      .insert()
-      .into(TagEntity)
-      .values(names.map((name) => ({ id: randomUUID(), name })))
-      .orIgnore()
-      .execute();
-    const savedTags = await tags.findBy({ name: In(names) });
+    const sortedNames = [...names].sort((left, right) =>
+      left.localeCompare(right),
+    );
+    const existingTags = await tags.findBy({ name: In(sortedNames) });
+    const existingNames = new Set(existingTags.map((tag) => tag.name));
+    const missingNames = sortedNames.filter((name) => !existingNames.has(name));
+
+    if (missingNames.length > 0) {
+      await tags
+        .createQueryBuilder()
+        .insert()
+        .into(TagEntity)
+        .values(missingNames.map((name) => ({ id: randomUUID(), name })))
+        .orIgnore()
+        .execute();
+    }
+
+    const savedTags =
+      missingNames.length === 0
+        ? existingTags
+        : await tags.findBy({ name: In(sortedNames) });
     await articleTags.insert(
       savedTags.map((tag) => ({ articleId, tagId: tag.id })),
     );
