@@ -34,6 +34,7 @@ import type {
   CommentsEnvelopeResponse,
 } from './comment-response';
 import { CommentsService } from './comments.service';
+import { COMMENT_BODY_MAX_LENGTH } from './comments.constants';
 
 const COMMENT_EXAMPLE = {
   id: '3acb544c-7b01-4b53-8c2b-e9ba78f0266f',
@@ -62,8 +63,7 @@ export class CommentsController {
   @ApiUnauthorizedResponse({ description: 'Authentication is required.' })
   @ApiNotFoundResponse({ description: 'Article not found.' })
   @ApiUnprocessableEntityResponse({
-    description:
-      'Invalid slug or comment; body must contain 1–10000 characters after trimming.',
+    description: `Invalid slug or comment; body must contain 1–${COMMENT_BODY_MAX_LENGTH} characters after trimming.`,
   })
   create(
     @Req() request: AuthenticatedRequest,

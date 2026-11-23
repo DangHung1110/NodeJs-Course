@@ -10,15 +10,20 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { ArticleSlugParamDto } from '../articles/article.dto';
+import { trimString } from '../common/trim-string.transform';
+import { COMMENT_BODY_MAX_LENGTH } from './comments.constants';
 
 export class CreateCommentDto {
-  @ApiProperty({ example: 'A useful article!', maxLength: 10000 })
-  @Transform(({ obj }: { obj: Record<string, unknown> }) =>
-    typeof obj.body === 'string' ? obj.body.trim() : obj.body,
-  )
+  @ApiProperty({
+    example: 'A useful article!',
+    maxLength: COMMENT_BODY_MAX_LENGTH,
+  })
+  // Preserve JSON types instead of implicitly converting numbers to strings.
+  @Type(() => Object)
+  @Transform(trimString)
   @IsString()
   @IsNotEmpty()
-  @MaxLength(10000)
+  @MaxLength(COMMENT_BODY_MAX_LENGTH)
   body!: string;
 }
 

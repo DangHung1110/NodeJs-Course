@@ -20,10 +20,7 @@ import {
   MAX_ARTICLE_LIMIT,
   MAX_TAGS_PER_ARTICLE,
 } from './article.constants';
-
-function trimString({ value }: { value: unknown }): unknown {
-  return typeof value === 'string' ? value.trim() : value;
-}
+import { trimString } from '../common/trim-string.transform';
 
 function normalizeTags({ value }: { value: unknown }): unknown {
   if (!Array.isArray(value)) return value;

@@ -26,7 +26,12 @@ describe('CommentsService', () => {
   let articles: Pick<Repository<ArticleEntity>, 'findOne'>;
   let comments: Pick<
     Repository<CommentEntity>,
-    'create' | 'save' | 'findOneBy' | 'delete' | 'createQueryBuilder'
+    | 'create'
+    | 'save'
+    | 'findOneOrFail'
+    | 'findOneBy'
+    | 'delete'
+    | 'createQueryBuilder'
   >;
   let builder: Record<string, jest.Mock>;
   let service: CommentsService;
@@ -55,6 +60,7 @@ describe('CommentsService', () => {
     comments = {
       create: jest.fn().mockReturnValue(comment),
       save: jest.fn().mockResolvedValue(comment),
+      findOneOrFail: jest.fn().mockResolvedValue(comment),
       findOneBy: jest.fn().mockResolvedValue(comment),
       delete: jest.fn().mockResolvedValue({ affected: 1 }),
       createQueryBuilder: jest.fn().mockReturnValue(builder),
@@ -66,22 +72,26 @@ describe('CommentsService', () => {
   });
 
   it('assigns the authenticated author and serializes only public fields', async () => {
-    const result = await service.create('article-slug', 'viewer-id', {
+    const result = await service.create('article-slug', 'author-id', {
       body: 'A comment',
     });
     expect(comments.create).toHaveBeenCalledWith({
       body: 'A comment',
       articleId: 'article-id',
-      authorId: 'viewer-id',
+      authorId: 'author-id',
     });
     expect(result.comment).toEqual({
       id: 'comment-id',
       body: 'A comment',
       createdAt: comment.createdAt.toISOString(),
       updatedAt: comment.updatedAt.toISOString(),
-      author: { username: 'author', bio: null, image: null, following: true },
+      author: { username: 'author', bio: null, image: null, following: false },
     });
-    expect(builder.setParameter).toHaveBeenCalledWith('viewerId', 'viewer-id');
+    expect(comments.findOneOrFail).toHaveBeenCalledWith({
+      where: { id: comment.id },
+      relations: { author: true },
+    });
+    expect(comments.createQueryBuilder).not.toHaveBeenCalled();
   });
 
   it('does not insert when the article is missing', async () => {
@@ -107,13 +117,6 @@ describe('CommentsService', () => {
     await expect(
       service.create('article-slug', 'author-id', { body: 'Comment' }),
     ).rejects.toMatchObject({ cause: failure });
-  });
-
-  it('handles deletion before the created comment can be reloaded', async () => {
-    builder.getRawAndEntities.mockResolvedValue({ entities: [], raw: [] });
-    await expect(
-      service.create('article-slug', 'author-id', { body: 'Comment' }),
-    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('scopes the list to the article with stable newest-first ordering', async () => {

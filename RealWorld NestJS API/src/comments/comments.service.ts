@@ -50,15 +50,11 @@ export class CommentsService {
         cause: error,
       });
     }
-    const { entities, raw } = await this.commentQuery(authorId)
-      .where('comment.id = :id AND comment.articleId = :articleId', {
-        id: comment.id,
-        articleId: article.id,
-      })
-      .getRawAndEntities<CommentMetricsRaw>();
-    const saved = entities[0];
-    if (!saved) throw new NotFoundException('Comment not found.');
-    return { comment: toComment(saved, Number(raw[0]?.following) === 1) };
+    const saved = await this.commentsRepository.findOneOrFail({
+      where: { id: comment.id },
+      relations: { author: true },
+    });
+    return { comment: toComment(saved, false) };
   }
 
   async list(

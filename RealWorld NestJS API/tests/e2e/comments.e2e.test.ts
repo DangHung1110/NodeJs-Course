@@ -12,6 +12,7 @@ import request from 'supertest';
 import { configureApp } from '../../src/app.setup';
 import { CommentsController } from '../../src/comments/comments.controller';
 import { CommentsService } from '../../src/comments/comments.service';
+import { COMMENT_BODY_MAX_LENGTH } from '../../src/comments/comments.constants';
 import { OptionalJwtAuthGuard } from '../../src/profiles/optional-jwt-auth.guard';
 import { TagsController } from '../../src/tags/tags.controller';
 import { TagsService } from '../../src/tags/tags.service';
@@ -99,7 +100,7 @@ describe('PR-05 HTTP validation and documentation', () => {
     { comment: { body: '  \n ' } },
     { comment: { body: 123 } },
     { comment: { body: true } },
-    { comment: { body: 'x'.repeat(10001) } },
+    { comment: { body: 'x'.repeat(COMMENT_BODY_MAX_LENGTH + 1) } },
     { comment: { body: 'Comment', authorId: 'forged' } },
   ])('rejects invalid payload %# before service execution', async (payload) => {
     await request(server)
@@ -120,6 +121,18 @@ describe('PR-05 HTTP validation and documentation', () => {
       .expect(401);
     expect(service.create).not.toHaveBeenCalled();
     expect(service.delete).not.toHaveBeenCalled();
+  });
+
+  it('accepts the maximum body length after trimming', async () => {
+    const body = 'x'.repeat(COMMENT_BODY_MAX_LENGTH);
+    await request(server)
+      .post('/api/articles/article-123/comments')
+      .set('Authorization', 'Token test')
+      .send({ comment: { body: `  ${body}  ` } })
+      .expect(201);
+    expect(service.create).toHaveBeenCalledWith('article-123', 'viewer-id', {
+      body,
+    });
   });
 
   it('accepts public reads and forwards optional viewer context', async () => {
