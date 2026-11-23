@@ -1,4 +1,5 @@
 import { DataSource } from 'typeorm';
+import { E2eApp } from '../support/e2e-app';
 import {
   assertTestDatabase,
   resetTestDatabase,
@@ -16,6 +17,36 @@ const safe = {
 };
 
 describe('Destructive test database guard', () => {
+  it.each([
+    { MYSQL_TEST_USER: 'root', REDIS_TEST_URL: 'redis://127.0.0.1:16379/15' },
+    {
+      MYSQL_TEST_USER: 'realworld_test',
+      REDIS_TEST_URL: 'redis://127.0.0.1:16379/0',
+    },
+  ])(
+    'preserves the environment after startup validation fails and close repeats',
+    async (invalid) => {
+      const previous = process.env;
+      process.env = {
+        ...previous,
+        ...safe,
+        ...invalid,
+        PR06_ENV_SENTINEL: 'preserve-me',
+      };
+      const context = new E2eApp();
+      try {
+        await expect(context.start()).rejects.toThrow();
+        await context.close();
+        await context.close();
+        expect(process.env.PR06_ENV_SENTINEL).toBe('preserve-me');
+        expect(process.env.NODE_ENV).toBe('test');
+        expect(context.ds).toBeUndefined();
+        expect(context.redis).toBeUndefined();
+      } finally {
+        process.env = previous;
+      }
+    },
+  );
   it.each([
     ['NODE_ENV', 'development'],
     ['MYSQL_TEST_DATABASE', 'realworld'],

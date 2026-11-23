@@ -24,7 +24,7 @@ export class E2eApp {
   readonly prefix = `e2e:${randomUUID()}:`;
   readonly outbox = new Map<string, string>();
   ready = false;
-  private originalEnv: NodeJS.ProcessEnv = {};
+  private originalEnv?: NodeJS.ProcessEnv;
 
   get server(): Server {
     if (!this.app) throw new Error('E2E app not initialized');
@@ -32,6 +32,7 @@ export class E2eApp {
   }
 
   async start(): Promise<void> {
+    this.originalEnv = { ...process.env };
     const database = testDatabaseConfig();
     const redisUrl = process.env.REDIS_TEST_URL;
     if (!redisUrl) throw new Error('REDIS_TEST_URL is required');
@@ -43,7 +44,6 @@ export class E2eApp {
     ) {
       throw new Error('E2E Redis must be explicit loopback DB 15');
     }
-    this.originalEnv = { ...process.env };
     this.uploadRoot = await mkdtemp(join(tmpdir(), 'realworld-e2e-'));
     Object.assign(process.env, {
       NODE_ENV: 'test',
@@ -170,7 +170,10 @@ export class E2eApp {
             }
           } finally {
             this.ready = false;
-            process.env = this.originalEnv;
+            if (this.originalEnv) {
+              process.env = this.originalEnv;
+              this.originalEnv = undefined;
+            }
           }
         }
       }

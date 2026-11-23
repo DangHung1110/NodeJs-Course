@@ -74,7 +74,8 @@ guard, validation và service thật, không phải bằng chứng coverage toà
 
 Jest instrument đúng `src/comments/comments.controller.ts`; threshold từng file
 100% statements/branches/functions/lines, không bỏ qua nhánh khó. Báo cáo nằm ở
-`coverage/e2e/index.html`, `lcov.info`, `coverage-summary.json` và text console.
+`coverage/e2e/lcov-report/index.html`, `coverage/e2e/lcov.info`,
+`coverage/e2e/coverage-summary.json` và text console.
 Kết quả thực tế: 8/8 E2E pass; CommentsController đạt 100% statements,
 branches (4/4), functions và lines, không còn nhánh chưa chạy. ts-jest dùng TypeScript
 compiler đầy đủ (không isolated transpilation) và target ES2019 để Istanbul
