@@ -12,3 +12,6 @@ This bundle **replaces the previous eight-sprint plan** with the mentor's six-PR
 - All PRs: Sunlint errors 0, screenshot in PR comment; Copilot review → fix → self-review → mentor review.
 
 `docs/REFERENCES.md` links the mentor's tutorial; skip section 5.2 as instructed. Mail queue and scheduling are listed as learning extensions, not invented product APIs.
+
+PR-06: xem [hướng dẫn E2E và C2](docs/E2E_TESTING.md) để chạy MySQL/Redis test
+riêng, seed/cleanup, kiểm tra migration và tạo báo cáo coverage.

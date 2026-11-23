@@ -17,6 +17,7 @@ import { TagsModule } from './tags/tags.module';
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
+      ignoreEnvFile: process.env.NODE_ENV === 'test',
       envFilePath: ['.env.local', '.env'],
       validate: validateEnvironment,
     }),

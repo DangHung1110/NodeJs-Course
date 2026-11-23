@@ -72,7 +72,7 @@ describe('ArticlesService', () => {
     articleRepository = {
       create: jest.fn((input: Partial<ArticleEntity>) =>
         Object.assign(article, input),
-      ),
+      ) as unknown as Repository<ArticleEntity>['create'],
       save: jest.fn().mockResolvedValue(article),
       findOne: jest.fn().mockResolvedValue(article),
       findOneBy: jest.fn().mockResolvedValue(article),
@@ -114,7 +114,7 @@ describe('ArticlesService', () => {
         if (entity === ArticleTagEntity) return articleTagRepository;
         if (entity === TagEntity) return tagRepository;
         throw new Error('Unexpected repository.');
-      }) as EntityManager['getRepository'],
+      }) as unknown as EntityManager['getRepository'],
     };
     dataSource = {
       transaction: jest.fn(
@@ -132,7 +132,7 @@ describe('ArticlesService', () => {
         if (entity === ArticleEntity) return articleRepository;
         if (entity === FavoriteEntity) return favoriteRepository;
         throw new Error('Unexpected repository.');
-      }) as DataSource['getRepository'],
+      }) as unknown as DataSource['getRepository'],
     };
     queryService = {
       findBySlug: jest.fn().mockResolvedValue(response),

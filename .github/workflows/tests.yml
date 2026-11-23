@@ -23,6 +23,8 @@ jobs:
         env:
           MYSQL_ROOT_PASSWORD: root
           MYSQL_DATABASE: realworld_test
+          MYSQL_USER: realworld_test
+          MYSQL_PASSWORD: isolated-test-password
         ports:
           - 3306:3306
         options: >-
@@ -30,13 +32,25 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
 
     env:
       MYSQL_TEST_HOST: 127.0.0.1
       MYSQL_TEST_PORT: 3306
-      MYSQL_TEST_USER: root
-      MYSQL_TEST_PASSWORD: root
+      NODE_ENV: test
+      MYSQL_TEST_USER: realworld_test
+      MYSQL_TEST_PASSWORD: isolated-test-password
       MYSQL_TEST_DATABASE: realworld_test
+      MYSQL_TEST_APPROVED_DATABASE: realworld_test
+      REDIS_TEST_URL: redis://127.0.0.1:6379/15
 
     steps:
       - name: Checkout
@@ -45,7 +59,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: "22"
           cache: npm
           cache-dependency-path: RealWorld NestJS API/package-lock.json
 
@@ -58,5 +72,25 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Typecheck source and tests
+        run: npm run typecheck
+
       - name: Test
         run: npm run test
+
+      - name: Full application E2E and C2 coverage
+        run: npm run test:e2e:coverage
+
+      - name: Repeat E2E to detect state leakage
+        run: npm run test:e2e -- --randomize --seed=606
+
+      - name: Run comment workflow independently
+        run: npm run test:e2e -- --testNamePattern=CommentsController
+
+      - name: Upload coverage evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr06-e2e-coverage
+          path: RealWorld NestJS API/coverage/e2e
+          if-no-files-found: warn

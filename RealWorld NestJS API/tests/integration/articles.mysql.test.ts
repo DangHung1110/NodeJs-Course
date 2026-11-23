@@ -1,3 +1,8 @@
+import {
+  assertTestDatabase,
+  resetTestDatabase,
+  testDatabaseConfig,
+} from '../support/database-safety';
 import { randomUUID } from 'node:crypto';
 import { INestApplication } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -41,13 +46,6 @@ import { AddFollowsAndAttachments1731300000000 } from '../../src/database/migrat
 const hasMysqlTestDatabase = Boolean(process.env.MYSQL_TEST_HOST);
 const describeMysql = hasMysqlTestDatabase ? describe : describe.skip;
 
-function requiredEnvironment(name: string): string {
-  const value = process.env[name];
-  if (!value)
-    throw new Error(`${name} is required for MySQL integration tests.`);
-  return value;
-}
-
 describeMysql('Articles and comments MySQL integration', () => {
   let dataSource: DataSource;
   let articlesService: ArticlesService;
@@ -66,18 +64,9 @@ describeMysql('Articles and comments MySQL integration', () => {
   }
 
   beforeAll(async () => {
-    const database = requiredEnvironment('MYSQL_TEST_DATABASE');
-    if (!database.endsWith('_test')) {
-      throw new Error('MYSQL_TEST_DATABASE must end with _test.');
-    }
-
     dataSource = new DataSource({
       type: 'mysql',
-      host: requiredEnvironment('MYSQL_TEST_HOST'),
-      port: Number(requiredEnvironment('MYSQL_TEST_PORT')),
-      username: requiredEnvironment('MYSQL_TEST_USER'),
-      password: requiredEnvironment('MYSQL_TEST_PASSWORD'),
-      database,
+      ...testDatabaseConfig(),
       entities: [
         UserEntity,
         FollowEntity,
@@ -99,7 +88,7 @@ describeMysql('Articles and comments MySQL integration', () => {
       synchronize: false,
     });
     await dataSource.initialize();
-    await dataSource.dropDatabase();
+    await assertTestDatabase(dataSource);
     await dataSource.runMigrations();
 
     articleQueryService = new ArticleQueryService(
@@ -161,24 +150,20 @@ describeMysql('Articles and comments MySQL integration', () => {
   }, 60_000);
 
   afterAll(async () => {
-    if (app) await app.close();
-    if (dataSource?.isInitialized) await dataSource.destroy();
+    try {
+      if (dataSource?.isInitialized) await resetTestDatabase(dataSource);
+    } finally {
+      try {
+        if (app) await app.close();
+      } finally {
+        if (dataSource?.isInitialized) await dataSource.destroy();
+      }
+    }
   });
 
   beforeEach(async () => {
     revokedTokens.clear();
-    for (const table of [
-      'comments',
-      'favorites',
-      'article_tags',
-      'articles',
-      'tags',
-      'follows',
-      'attachments',
-      'users',
-    ]) {
-      await dataSource.query(`DELETE FROM ${table}`);
-    }
+    await resetTestDatabase(dataSource);
   });
 
   async function createArticle(
@@ -415,6 +400,7 @@ describeMysql('Articles and comments MySQL integration', () => {
       expect(
         table?.columns.find((column) => column.name === 'id')?.length,
       ).toBe('36');
+      await assertTestDatabase(dataSource);
       await dataSource.undoLastMigration();
       await expect(runner.hasTable('comments')).resolves.toBe(false);
       await expect(
@@ -423,6 +409,7 @@ describeMysql('Articles and comments MySQL integration', () => {
       await expect(dataSource.getRepository(UserEntity).count()).resolves.toBe(
         1,
       );
+      await assertTestDatabase(dataSource);
       await dataSource.runMigrations();
       await expect(runner.hasTable('comments')).resolves.toBe(true);
       await expect(

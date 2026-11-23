@@ -10,6 +10,7 @@
   },
   "scripts": {
     "build": "nest build",
+    "typecheck": "tsc --noEmit --incremental false",
     "format": "prettier --write \"src/**/*.ts\" \"tests/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -19,13 +20,15 @@
     "lint:fix": "eslint \"src/**/*.ts\" \"tests/**/*.ts\" --fix",
     "test": "jest --runInBand",
     "test:unit": "jest --runInBand --selectProjects unit",
-    "test:e2e": "jest --runInBand --selectProjects e2e",
+    "test:e2e": "jest --config jest.e2e.config.cjs --runInBand",
     "test:integration": "jest --runInBand --selectProjects integration",
     "migration:create": "typeorm migration:create",
     "migration:generate": "npm run build && typeorm migration:generate",
     "migration:run": "npm run build && typeorm migration:run -d dist/database/data-source.js",
     "migration:revert": "npm run build && typeorm migration:revert -d dist/database/data-source.js",
-    "migration:reset": "npm run build && node scripts/reset-database.cjs"
+    "migration:reset": "npm run build && node scripts/reset-database.cjs",
+    "test:e2e:coverage": "npm run test:e2e -- --coverage",
+    "test:http": "jest --runInBand --selectProjects e2e"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -73,6 +76,9 @@
           "ts",
           "js",
           "json"
+        ],
+        "setupFiles": [
+          "<rootDir>/tests/support/load-test-env.cjs"
         ]
       },
       {
@@ -94,6 +100,9 @@
           "ts",
           "js",
           "json"
+        ],
+        "setupFiles": [
+          "<rootDir>/tests/support/load-test-env.cjs"
         ]
       },
       {
@@ -115,6 +124,9 @@
           "ts",
           "js",
           "json"
+        ],
+        "setupFiles": [
+          "<rootDir>/tests/support/load-test-env.cjs"
         ]
       }
     ]

@@ -15,6 +15,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     this.isTest = configService.get<string>('NODE_ENV') === 'test';
     this.client = new Redis(configService.getOrThrow<string>('REDIS_URL'), {
       lazyConnect: true,
+      keyPrefix: configService.get<string>('REDIS_KEY_PREFIX', ''),
       maxRetriesPerRequest: 1,
       retryStrategy: (attempt) =>
         Math.min(attempt * REDIS_RETRY_STEP_MS, REDIS_RETRY_MAX_DELAY_MS),
