@@ -55,7 +55,8 @@ việc giới hạn quyền DB hoặc môi trường container tách biệt.
 
 Các test guard dùng DataSource giả, không reset DB không phải test để thử guard.
 Suite kiểm tra count=0, không còn Redis key theo prefix và thư mục upload rỗng sau
-từng case; có cả tình huống workflow ném lỗi có chủ ý.
+từng case. Không coi test tự bắt lỗi rồi tự gọi reset là bằng chứng teardown khi
+một kịch bản thất bại thật.
 
 Không gọi migration CLI production với `.env` khi test. E2E gọi `runMigrations()`
 trên DataSource đã xác thực. Case migration chạy down/up migration comments cuối
@@ -76,7 +77,8 @@ Jest instrument đúng `src/comments/comments.controller.ts`; threshold từng f
 100% statements/branches/functions/lines, không bỏ qua nhánh khó. Báo cáo nằm ở
 `coverage/e2e/lcov-report/index.html`, `coverage/e2e/lcov.info`,
 `coverage/e2e/coverage-summary.json` và text console.
-Kết quả thực tế: 8/8 E2E pass; CommentsController đạt 100% statements,
+Kết quả sau review mentor: 7 kịch bản E2E (bỏ case cleanup trùng lặp);
+CommentsController đạt 100% statements,
 branches (4/4), functions và lines, không còn nhánh chưa chạy. ts-jest dùng TypeScript
 compiler đầy đủ (không isolated transpilation) và target ES2019 để Istanbul
 ghi nhận quyết định optional chaining thay vì báo 100% với 0 branch.

@@ -1,6 +1,5 @@
 import request from 'supertest';
-import { readdir, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readdir } from 'node:fs/promises';
 import { AttachmentEntity } from '../../src/database/entities/attachment.entity';
 import { CommentEntity } from '../../src/database/entities/comment.entity';
 import { UserEntity } from '../../src/database/entities/user.entity';
@@ -352,29 +351,14 @@ describe('Full application E2E (isolated MySQL and Redis)', () => {
   });
 
   it('uses the production i18n bootstrap', async () => {
-    const en = await request(context.server)
+    await request(context.server)
       .get('/api/hello')
       .set('Accept-Language', 'en')
-      .expect(200);
-    const vi = await request(context.server)
+      .expect(200, { message: 'Hello World!' });
+    await request(context.server)
       .get('/api/hello')
       .set('Accept-Language', 'vi')
-      .expect(200);
-    expect(vi.body).not.toEqual(en.body);
-  });
-
-  it('cleans database, Redis and uploads even when the scenario throws', async () => {
-    try {
-      await context.redis!.set(`${context.prefix}failure`, 'test');
-      await writeFile(join(context.uploadRoot, 'failure.txt'), 'test upload');
-      throw new Error('Deliberate scenario failure');
-    } catch (error) {
-      expect((error as Error).message).toBe('Deliberate scenario failure');
-    } finally {
-      await context.reset();
-    }
-    expect(await context.ds!.getRepository(UserEntity).count()).toBe(0);
-    expect(await context.redis!.exists(`${context.prefix}failure`)).toBe(0);
+      .expect(200, { message: 'Xin chào!' });
   });
 
   it('reverts and reapplies the latest migration only inside the approved database', async () => {

@@ -24,7 +24,10 @@ import {
   CommentsEnvelopeResponse,
 } from '../../src/comments/comment-response';
 import { CommentEntity } from '../../src/database/entities/comment.entity';
-import { AddComments1731500000000 } from '../../src/database/migrations/1731500000000-AddComments';
+import {
+  DATABASE_ENTITIES,
+  DATABASE_MIGRATIONS,
+} from '../../src/database/database.registry';
 import { OptionalJwtAuthGuard } from '../../src/profiles/optional-jwt-auth.guard';
 import { TagsController } from '../../src/tags/tags.controller';
 import { TagsService } from '../../src/tags/tags.service';
@@ -33,15 +36,9 @@ import { ArticleQueryService } from '../../src/articles/article-query.service';
 import { ArticlesService } from '../../src/articles/articles.service';
 import { ArticleTagEntity } from '../../src/database/entities/article-tag.entity';
 import { ArticleEntity } from '../../src/database/entities/article.entity';
-import { AttachmentEntity } from '../../src/database/entities/attachment.entity';
-import { FavoriteEntity } from '../../src/database/entities/favorite.entity';
 import { FollowEntity } from '../../src/database/entities/follow.entity';
 import { TagEntity } from '../../src/database/entities/tag.entity';
 import { UserEntity } from '../../src/database/entities/user.entity';
-import { AddArticlesTagsAndFavorites1731400000000 } from '../../src/database/migrations/1731400000000-AddArticlesTagsAndFavorites';
-import { CreateUsers1731100000000 } from '../../src/database/migrations/1731100000000-CreateUsers';
-import { AddAuthVerificationFields1731200000000 } from '../../src/database/migrations/1731200000000-AddAuthVerificationFields';
-import { AddFollowsAndAttachments1731300000000 } from '../../src/database/migrations/1731300000000-AddFollowsAndAttachments';
 
 const hasMysqlTestDatabase = Boolean(process.env.MYSQL_TEST_HOST);
 const describeMysql = hasMysqlTestDatabase ? describe : describe.skip;
@@ -67,23 +64,8 @@ describeMysql('Articles and comments MySQL integration', () => {
     dataSource = new DataSource({
       type: 'mysql',
       ...testDatabaseConfig(),
-      entities: [
-        UserEntity,
-        FollowEntity,
-        AttachmentEntity,
-        ArticleEntity,
-        TagEntity,
-        ArticleTagEntity,
-        FavoriteEntity,
-        CommentEntity,
-      ],
-      migrations: [
-        CreateUsers1731100000000,
-        AddAuthVerificationFields1731200000000,
-        AddFollowsAndAttachments1731300000000,
-        AddArticlesTagsAndFavorites1731400000000,
-        AddComments1731500000000,
-      ],
+      entities: DATABASE_ENTITIES,
+      migrations: DATABASE_MIGRATIONS,
       migrationsTableName: 'typeorm_migrations',
       synchronize: false,
     });
