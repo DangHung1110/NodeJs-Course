@@ -53,7 +53,7 @@ describe('ArticleQueryService', () => {
     const subquery = chainedBuilder();
     articleBuilder = chainedBuilder();
     articleBuilder.subQuery = jest.fn().mockReturnValue(subquery);
-    articleBuilder.andWhere.mockImplementation(
+    articleBuilder.andWhere!.mockImplementation(
       (condition: string | ((builder: unknown) => string)) => {
         if (typeof condition === 'function') condition(articleBuilder);
         return articleBuilder;
@@ -149,7 +149,7 @@ describe('ArticleQueryService', () => {
   });
 
   it('returns an empty list without querying tags when no articles match', async () => {
-    articleBuilder.getRawAndEntities.mockResolvedValueOnce({
+    articleBuilder.getRawAndEntities!.mockResolvedValueOnce({
       entities: [],
       raw: [],
     });
@@ -162,7 +162,7 @@ describe('ArticleQueryService', () => {
   });
 
   it('throws for a missing slug', async () => {
-    articleBuilder.getRawAndEntities.mockResolvedValueOnce({
+    articleBuilder.getRawAndEntities!.mockResolvedValueOnce({
       entities: [],
       raw: [],
     });

@@ -1,19 +1,7 @@
+import { DATABASE_ENTITIES, DATABASE_MIGRATIONS } from './database.registry';
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { UserEntity } from './entities/user.entity';
-import { AttachmentEntity } from './entities/attachment.entity';
-import { FollowEntity } from './entities/follow.entity';
-import { ArticleEntity } from './entities/article.entity';
-import { ArticleTagEntity } from './entities/article-tag.entity';
-import { FavoriteEntity } from './entities/favorite.entity';
-import { TagEntity } from './entities/tag.entity';
-import { CommentEntity } from './entities/comment.entity';
-import { AddComments1731500000000 } from './migrations/1731500000000-AddComments';
-import { CreateUsers1731100000000 } from './migrations/1731100000000-CreateUsers';
-import { AddAuthVerificationFields1731200000000 } from './migrations/1731200000000-AddAuthVerificationFields';
-import { AddFollowsAndAttachments1731300000000 } from './migrations/1731300000000-AddFollowsAndAttachments';
-import { AddArticlesTagsAndFavorites1731400000000 } from './migrations/1731400000000-AddArticlesTagsAndFavorites';
 
 @Module({
   imports: [
@@ -26,23 +14,8 @@ import { AddArticlesTagsAndFavorites1731400000000 } from './migrations/173140000
         username: configService.getOrThrow<string>('DB_USERNAME'),
         password: configService.getOrThrow<string>('DB_PASSWORD'),
         database: configService.getOrThrow<string>('DB_DATABASE'),
-        entities: [
-          UserEntity,
-          FollowEntity,
-          AttachmentEntity,
-          ArticleEntity,
-          TagEntity,
-          ArticleTagEntity,
-          FavoriteEntity,
-          CommentEntity,
-        ],
-        migrations: [
-          CreateUsers1731100000000,
-          AddAuthVerificationFields1731200000000,
-          AddFollowsAndAttachments1731300000000,
-          AddArticlesTagsAndFavorites1731400000000,
-          AddComments1731500000000,
-        ],
+        entities: DATABASE_ENTITIES,
+        migrations: DATABASE_MIGRATIONS,
         migrationsTableName: 'typeorm_migrations',
         synchronize: false,
         migrationsRun: false,

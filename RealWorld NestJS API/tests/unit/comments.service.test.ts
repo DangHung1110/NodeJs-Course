@@ -132,7 +132,7 @@ describe('CommentsService', () => {
   });
 
   it('sets anonymous following to false in the query', async () => {
-    builder.getRawAndEntities.mockResolvedValue({
+    builder.getRawAndEntities!.mockResolvedValue({
       entities: [comment],
       raw: [{ following: 0 }],
     });
@@ -143,7 +143,7 @@ describe('CommentsService', () => {
   });
 
   it('returns an empty list for an article without comments', async () => {
-    builder.getRawAndEntities.mockResolvedValue({ entities: [], raw: [] });
+    builder.getRawAndEntities!.mockResolvedValue({ entities: [], raw: [] });
     await expect(service.list('article-slug')).resolves.toEqual({
       comments: [],
     });
